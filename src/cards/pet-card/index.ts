@@ -75,6 +75,25 @@ export class PetCard extends LitElement {
   private get _rangeDays(): number {
     return this.config.weight_range_days ?? 30;
   }
+  /** lb→kg factor from the source sensor's unit (1 if already metric). */
+  private get _factor(): number {
+    const e = this.config.weight_history ?? this.config.weight;
+    const u = (e && this._hass?.states[e]?.attributes?.unit_of_measurement) || "";
+    return /lb/i.test(String(u)) ? 0.453592 : 1;
+  }
+  private _relSeen(entity?: string): string | undefined {
+    if (!entity) return undefined;
+    const s = this._hass?.states[entity];
+    if (!s?.last_changed) return undefined;
+    const diff = Date.now() - new Date(s.last_changed).getTime();
+    if (!Number.isFinite(diff) || diff < 0) return undefined;
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
 
   updated(): void {
     const wh = this.config.weight_history ?? this.config.weight;
@@ -97,8 +116,9 @@ export class PetCard extends LitElement {
         minimal_response: true,
         no_attributes: true,
       });
+      const f = this._factor;
       const pts: Pt[] = ((res?.[wh] as any[]) ?? [])
-        .map((p) => ({ t: (p.lu ?? p.last_updated) * 1000, v: Number(p.s ?? p.state) }))
+        .map((p) => ({ t: (p.lu ?? p.last_updated) * 1000, v: Number(p.s ?? p.state) * f }))
         .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v));
       this.hist = { pts, key };
     } catch {
@@ -115,31 +135,29 @@ export class PetCard extends LitElement {
   render() {
     if (!this.config || !this._hass) return nothing;
     const c = this.config;
-    const weight = stateNum(this._hass, c.weight);
-    const wUnit = (c.weight && this._hass.states[c.weight]?.attributes?.unit_of_measurement) || "lb";
+    const raw = stateNum(this._hass, c.weight);
+    const weight = raw !== undefined ? raw * this._factor : undefined;
     const visits = stateNum(this._hass, c.visits);
     const seen = stateStr(this._hass, c.last_seen);
+    const rel = this._relSeen(c.last_seen);
+    const seenLabel = seen ? `${seen}${rel ? ` · ${rel}` : ""}` : undefined;
     return html`
       <ha-card style=${styleMap({ "--pet-accent": this._accent })}>
         <div class="top">
           ${this._renderAvatar()}
-          <div class="id">
-            <div class="name">${c.name ?? "Pet"}</div>
-            ${c.subtitle ? html`<div class="sub">${c.subtitle}</div>` : nothing}
-          </div>
-          <ha-icon class="paw" icon="mdi:paw"></ha-icon>
+          <div class="id"><div class="name">${c.name ?? "Pet"}</div></div>
         </div>
 
         <div class="weight" @click=${() => this._more(c.weight)}>
           <span class="wv">${weight !== undefined ? weight.toFixed(1) : "–"}</span>
-          <span class="wu">${wUnit}</span>
+          <span class="wu">kg</span>
           ${this._renderTrend()}
         </div>
         ${this._renderSparkline()}
 
         <div class="chips">
           ${visits !== undefined ? this._chip("mdi:toilet", `${visits} litter visit${visits === 1 ? "" : "s"} today`, () => this._more(c.visits)) : nothing}
-          ${seen ? this._chip("mdi:map-marker", `Seen: ${seen}`, () => this._more(c.last_seen)) : nothing}
+          ${seenLabel ? this._chip("mdi:map-marker", seenLabel, () => this._more(c.last_seen)) : nothing}
           ${(c.extras ?? []).map((x) => this._extraChip(x))}
         </div>
       </ha-card>
@@ -173,7 +191,7 @@ export class PetCard extends LitElement {
     const vs = pts.map((p) => p.v);
     let lo = Math.min(...vs);
     let hi = Math.max(...vs);
-    if (hi - lo < 0.4) { const m = (hi + lo) / 2; lo = m - 0.25; hi = m + 0.25; } // avoid a flat-looking line
+    if (hi - lo < 0.2) { const m = (hi + lo) / 2; lo = m - 0.12; hi = m + 0.12; } // kg scale: avoid a flat-looking line
     const t0 = pts[0].t;
     const t1 = pts[pts.length - 1].t;
     const span = Math.max(1, t1 - t0);
