@@ -3,7 +3,7 @@
 import "./cards/phev-vehicle-card";
 // Phase 2/3 (queued): ./cards/battery-fleet-card, ./cards/laundry-tracker-card
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 // eslint-disable-next-line no-console
 console.info(
   `%c HOMELAB-LOVELACE-CARDS %c v${VERSION} `,
