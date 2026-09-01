@@ -1,0 +1,7 @@
+{
+  "name": "Homelab Lovelace Cards",
+  "filename": "homelab-cards.js",
+  "render_readme": true,
+  "hacs": "1.34.0",
+  "homeassistant": "2024.8.0"
+}
