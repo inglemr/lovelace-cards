@@ -12,12 +12,18 @@ interface ConsumableSpec {
   critical?: number;
   unit?: string;
 }
+interface OfflineSpec {
+  entity: string;
+  name?: string;
+  icon?: string;
+}
 interface NeedsAttentionConfig extends LovelaceCardConfig {
   type: string;
   title?: string;
   updates?: boolean; // scan update.* == on
   update_exclude?: string[]; // entity_id substrings to ignore
   consumables?: ConsumableSpec[];
+  offline?: OfflineSpec[]; // curated watch-list of always-on devices
   show_ok?: boolean; // show a "nothing needs attention" state (default true)
 }
 
@@ -97,11 +103,37 @@ export class NeedsAttentionCard extends LitElement {
     return out.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "critical" ? -1 : 1));
   }
 
+  private _offlineItems(): Item[] {
+    if (!this._hass) return [];
+    const out: Item[] = [];
+    for (const o of this.config.offline ?? []) {
+      const st = this._hass.states[o.entity];
+      // connectivity sensors report 'on' when connected; everything else is
+      // online unless its state is a non-value.
+      const online =
+        st &&
+        (st.attributes.device_class === "connectivity"
+          ? st.state === "on"
+          : st.state !== "unavailable" && st.state !== "unknown");
+      if (online) continue;
+      out.push({
+        key: o.entity,
+        icon: o.icon ?? "mdi:wifi-off",
+        label: o.name ?? (st?.attributes.friendly_name ?? o.entity),
+        value: "offline",
+        tone: "critical",
+        entity: o.entity,
+      });
+    }
+    return out;
+  }
+
   render() {
     if (!this.config || !this._hass) return nothing;
     const upd = this._updateItems();
     const cons = this._consumableItems();
-    const total = (upd.count ? 1 : 0) + cons.length;
+    const offline = this._offlineItems();
+    const total = (upd.count ? 1 : 0) + cons.length + offline.length;
 
     return html`
       <ha-card>
@@ -115,6 +147,7 @@ export class NeedsAttentionCard extends LitElement {
         </div>
         ${total
           ? html`<div class="list">
+              ${offline.map((i) => this._consRow(i))}
               ${upd.count ? this._updateRow(upd) : nothing}
               ${cons.map((i) => this._consRow(i))}
             </div>`
