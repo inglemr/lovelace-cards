@@ -7,8 +7,10 @@ import "./cards/action-button-card";
 import "./cards/battery-fleet-card";
 import "./cards/needs-attention-card";
 import "./cards/laundry-tracker-card";
+import "./cards/vacuum-card";
+import "./cards/feeder-card";
 
-const VERSION = "0.9.0";
+const VERSION = "0.10.1";
 // eslint-disable-next-line no-console
 console.info(
   `%c HOMELAB-LOVELACE-CARDS %c v${VERSION} `,
