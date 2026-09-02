@@ -5,9 +5,10 @@ import "./cards/pet-card";
 import "./cards/pet-activity-card";
 import "./cards/action-button-card";
 import "./cards/battery-fleet-card";
+import "./cards/needs-attention-card";
 // Queued: ./cards/laundry-tracker-card
 
-const VERSION = "0.6.0";
+const VERSION = "0.7.0";
 // eslint-disable-next-line no-console
 console.info(
   `%c HOMELAB-LOVELACE-CARDS %c v${VERSION} `,
