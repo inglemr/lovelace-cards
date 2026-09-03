@@ -470,10 +470,10 @@ export class PhevVehicleCard extends LitElement {
         <line class="grid" x1="0" y1="0" x2="100" y2="0" vector-effect="non-scaling-stroke" />
         <line class="grid" x1="0" y1="50" x2="100" y2="50" vector-effect="non-scaling-stroke" />
         <line class="grid" x1="0" y1="100" x2="100" y2="100" vector-effect="non-scaling-stroke" />
-        ${fuel.length ? svg`<path d=${this._path(fuel, t0, t1, true)} fill="url(#pvFuelG)" stroke="none" />` : nothing}
-        ${elec.length ? svg`<path d=${this._path(elec, t0, t1, true)} fill="url(#pvElecG)" stroke="none" />` : nothing}
-        ${fuel.length ? svg`<path d=${this._path(fuel, t0, t1, false)} fill="none" stroke="var(--pv-fuel)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />` : nothing}
-        ${elec.length ? svg`<path d=${this._path(elec, t0, t1, false)} fill="none" stroke="var(--pv-elec)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />` : nothing}
+        ${fuel.length ? svg`<path class="area" d=${this._path(fuel, t0, t1, true)} fill="url(#pvFuelG)" stroke="none" />` : nothing}
+        ${elec.length ? svg`<path class="area" d=${this._path(elec, t0, t1, true)} fill="url(#pvElecG)" stroke="none" />` : nothing}
+        ${fuel.length ? svg`<path class="line" pathLength="1" d=${this._path(fuel, t0, t1, false)} fill="none" stroke="var(--pv-fuel)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />` : nothing}
+        ${elec.length ? svg`<path class="line" pathLength="1" d=${this._path(elec, t0, t1, false)} fill="none" stroke="var(--pv-elec)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />` : nothing}
       </svg>
     </div>`;
   }

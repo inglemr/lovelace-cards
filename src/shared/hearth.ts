@@ -60,6 +60,13 @@ export const hearth = css`
   @keyframes hl-settle-dot { from { transform: scale(0.6); } to { transform: scale(1); } }
   @keyframes hl-sheet-in { from { opacity: 0; transform: scale(0.94) translateY(8px); } to { opacity: 1; transform: none; } }
 
+  /* sparkline draw-in — pair with a line path that has pathLength="1" and a base of
+     { stroke-dasharray: 1; stroke-dashoffset: 0 } so reduced-motion leaves it fully drawn */
+  @keyframes hl-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  @keyframes hl-fade { from { opacity: 0; } to { opacity: 1; } }
+  /* bar/gauge fill wipe-in on mount — needs transform-origin: left on the fill */
+  @keyframes hl-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
   @media (prefers-reduced-motion: reduce) {
     :host, :host * { animation: none !important; transition-duration: 1ms !important; }
   }

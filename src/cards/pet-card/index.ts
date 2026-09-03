@@ -207,8 +207,8 @@ export class PetCard extends LitElement {
             <stop offset="100%" stop-color="var(--pet-accent)" stop-opacity="0" />
           </linearGradient>
         </defs>
-        ${svg`<path d=${area} fill="url(#petG)" stroke="none" />`}
-        ${svg`<path d=${line} fill="none" stroke="var(--pet-accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" />`}
+        ${svg`<path class="area" d=${area} fill="url(#petG)" stroke="none" />`}
+        ${svg`<path class="line" pathLength="1" d=${line} fill="none" stroke="var(--pet-accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" />`}
       </svg>
     </div>`;
   }
@@ -253,6 +253,8 @@ export class PetCard extends LitElement {
 
     .spark { height: 46px; margin: 4px 0 10px; }
     .spark svg { width: 100%; height: 100%; overflow: visible; }
+    .spark path.line { stroke-dasharray: 1; stroke-dashoffset: 0; animation: hl-draw var(--hl-d4) var(--hl-settle) both; }
+    .spark path.area { animation: hl-fade var(--hl-d3) var(--hl-settle) both; }
     .spark.loading, .spark.empty { display: flex; align-items: center; justify-content: center; font-size: 11px; color: color-mix(in srgb, var(--primary-text-color) 40%, transparent); }
 
     .chips { display: flex; flex-wrap: wrap; gap: 7px; }

@@ -67,7 +67,7 @@ export const styles = css`
   .gauge .val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .gauge .val small { font-size: 11px; font-weight: 600; color: var(--pv-muted); margin-left: 2px; }
   .track { position: relative; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--primary-text-color) 10%, transparent); overflow: hidden; }
-  .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; transition: width 0.9s var(--hl-settle); }
+  .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; transform-origin: left center; transition: width 0.9s var(--hl-settle); animation: hl-grow-x var(--hl-d3) var(--hl-settle) both; }
   .fill.elec { background: linear-gradient(90deg, var(--pv-elec-2), var(--pv-elec)); box-shadow: 0 0 14px -2px color-mix(in srgb, var(--pv-elec) 70%, transparent); }
   .fill.fuel { background: linear-gradient(90deg, var(--pv-fuel-2), var(--pv-fuel)); box-shadow: 0 0 14px -2px color-mix(in srgb, var(--pv-fuel) 70%, transparent); }
 
@@ -125,6 +125,8 @@ export const styles = css`
   .graph .gpt.elec { color: var(--pv-elec); }
   .graph .gpt.fuel { color: var(--pv-fuel); }
   .graph svg { width: 100%; height: 100%; overflow: visible; }
+  .graph path.line { stroke-dasharray: 1; stroke-dashoffset: 0; animation: hl-draw var(--hl-d4) var(--hl-settle) both; }
+  .graph path.area { animation: hl-fade var(--hl-d3) var(--hl-settle) both; }
   .graph .grid { stroke: color-mix(in srgb, var(--primary-text-color) 10%, transparent); stroke-width: 1; stroke-dasharray: 3 4; }
   .graph .axis { font-size: 9px; fill: var(--pv-muted); }
   .graph .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--pv-muted); font-size: 13px; }
