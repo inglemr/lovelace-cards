@@ -12,8 +12,10 @@ import "./cards/feeder-card";
 import "./cards/room-card";
 import "./cards/presence-card";
 import "./cards/litter-card";
+import "./cards/nowplaying-card";
+import "./cards/security-card";
 
-const VERSION = "0.18.0";
+const VERSION = "0.18.2";
 // eslint-disable-next-line no-console
 console.info(
   `%c HOMELAB-LOVELACE-CARDS %c v${VERSION} `,
