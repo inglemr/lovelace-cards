@@ -43,6 +43,19 @@ export const hearth = css`
   /* every card settles in on load (cards that set their own animation override) */
   ha-card { animation: hl-rise var(--hl-d3) var(--hl-settle) both; }
 
+  /* Tactile press feedback across the dashboard. Loaded before each card's own
+     css, so where a card already animates an element (e.g. .tab background) that
+     rule wins and only the transform is added — never clobbering their motion. */
+  .row, .stat, .pill, .act, .tab, .appliance, .tile, .obj, .light,
+  .swatch, .next, .portion, .chip, .cell, .item, .btn {
+    transition: transform var(--hl-d1) var(--hl-shift);
+  }
+  .row:active, .stat:active, .act:active, .tab:active, .appliance:active,
+  .tile:active, .obj:active, .light:active, .swatch:active, .next:active,
+  .chip:active, .cell:active, .item:active, .btn:active {
+    transform: scale(0.975);
+  }
+
   @keyframes hl-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   @keyframes hl-settle-dot { from { transform: scale(0.6); } to { transform: scale(1); } }
   @keyframes hl-sheet-in { from { opacity: 0; transform: scale(0.94) translateY(8px); } to { opacity: 1; transform: none; } }
