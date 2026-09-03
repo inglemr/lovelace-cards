@@ -18,7 +18,7 @@ import "./cards/hearth-tile";
 import "./cards/camera-frame";
 import "./cards/agenda-card";
 
-const VERSION = "0.23.1";
+const VERSION = "0.23.3";
 // eslint-disable-next-line no-console
 console.info(
   `%c HOMELAB-LOVELACE-CARDS %c v${VERSION} `,

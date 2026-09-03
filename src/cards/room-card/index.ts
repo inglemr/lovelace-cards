@@ -32,7 +32,7 @@ interface RoomCardConfig extends LovelaceCardConfig {
   name: string;
   icon?: string;
   lights?: (string | LightSpec)[];
-  media?: string;
+  media?: string | string[]; // one player, or candidates (Cast/Jellyfin/etc.) — picks the richest active one
   navigation_path?: string;
 }
 
@@ -47,6 +47,12 @@ export class RoomCard extends LitElement {
   private _hass?: HomeAssistant;
   private _throttle = 0;
   private _vDrag = false;
+  // chip slide-to-dim
+  private _slideEntity?: string;
+  private _slideStartX = 0;
+  private _slideMoved = false;
+  private _slideThrottle = 0;
+  private _slideLast?: number;
 
   set hass(h: HomeAssistant) { this._hass = h; this.toggleAttribute("dark", !!(h?.themes as any)?.darkMode); this.requestUpdate(); }
   get hass(): HomeAssistant | undefined { return this._hass; }
@@ -104,7 +110,41 @@ export class RoomCard extends LitElement {
     window.setTimeout(() => el.classList.remove("pop"), 460);
   }
   private _toggleAll(e: Event) { e.stopPropagation(); if (!this._hass) return; this._pop(e.currentTarget as HTMLElement); const ids = this._presentLights.map((l) => l.entity); if (ids.length) this._hass.callService("light", this._onLights.length ? "turn_off" : "turn_on", { entity_id: ids }); }
-  private _toggleOne(entity: string, e: Event) { e.stopPropagation(); this._pop((e.currentTarget as HTMLElement).closest(".pill")); this._hass?.callService("light", "toggle", { entity_id: entity }); }
+  private _toggleOne(entity: string, e: Event) {
+    e.stopPropagation();
+    if (this._slideMoved) { this._slideMoved = false; return; } // was a slide, not a tap
+    this._pop((e.currentTarget as HTMLElement).closest(".pill"));
+    this._hass?.callService("light", "toggle", { entity_id: entity });
+  }
+  // drag a dimmable chip horizontally to set its brightness (tap still toggles)
+  private _chipDown(entity: string, e: PointerEvent) {
+    if (!this._canTune(entity)) return;
+    this._slideEntity = entity; this._slideStartX = e.clientX; this._slideMoved = false; this._slideLast = undefined;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  }
+  private _chipMove(entity: string, e: PointerEvent) {
+    if (this._slideEntity !== entity) return;
+    if (!this._slideMoved && Math.abs(e.clientX - this._slideStartX) < 6) return;
+    this._slideMoved = true;
+    const pill = (e.currentTarget as HTMLElement).closest(".pill") as HTMLElement | null;
+    if (!pill) return;
+    const r = pill.getBoundingClientRect();
+    const pct = clamp(Math.round(((e.clientX - r.left) / r.width) * 100), 1, 100);
+    this._slideLast = pct;
+    pill.style.setProperty("--bri", `${pct}%`);
+    pill.classList.add("on", "sliding");
+    const now = Date.now();
+    if (now - this._slideThrottle > 180) { this._slideThrottle = now; this._hass?.callService("light", "turn_on", { entity_id: entity, brightness_pct: pct }); }
+  }
+  private _chipUp(entity: string, e: PointerEvent) {
+    if (this._slideEntity !== entity) return;
+    this._slideEntity = undefined;
+    const pill = (e.currentTarget as HTMLElement).closest(".pill") as HTMLElement | null;
+    pill?.classList.remove("sliding");
+    if (this._slideMoved && this._slideLast != null) {
+      this._hass?.callService("light", "turn_on", { entity_id: entity, brightness_pct: this._slideLast });
+    }
+  }
 
   // ---- light-detail sheet (native <dialog> → top layer, escapes ancestor transforms) ----
   private _openEdit(entity: string, e: Event) {
@@ -171,7 +211,11 @@ export class RoomCard extends LitElement {
             const active = this._editEntity === l.entity;
             const bri = on ? (this._isSwitch(l.entity) ? 100 : this._briPct(l.entity)) : 100;
             return html`<div class="pill ${classMap({ on, offline })}" role="group" style=${styleMap({ "--bri": `${bri}%` })}>
-              <button class="pt" @click=${(e: Event) => this._toggleOne(l.entity, e)}>
+              <button class="pt" @click=${(e: Event) => this._toggleOne(l.entity, e)}
+                @pointerdown=${(e: PointerEvent) => this._chipDown(l.entity, e)}
+                @pointermove=${(e: PointerEvent) => this._chipMove(l.entity, e)}
+                @pointerup=${(e: PointerEvent) => this._chipUp(l.entity, e)}
+                @pointercancel=${(e: PointerEvent) => this._chipUp(l.entity, e)}>
                 <span class="dot ${classMap({ sq: this._isSwitch(l.entity) })}" style=${styleMap(on ? { "--dot-color": this._dotColor(l.entity) } : {})}></span><span class="pn">${this._shortName(l)}</span>
                 ${offline ? html`<span class="pb off">offline</span>` : on && this._canTune(l.entity) ? html`<span class="pb">${this._briPct(l.entity)}%</span>` : nothing}
               </button>
@@ -232,14 +276,31 @@ export class RoomCard extends LitElement {
     `;
   }
 
+  // media can be one entity or a list of candidates; pick the richest ACTIVE one
+  private _mediaEntity(): string | undefined {
+    const m = this.config.media; if (!m) return undefined;
+    const list = (Array.isArray(m) ? m : [m]).filter((e) => this._hass?.states[e]);
+    if (!list.length) return undefined;
+    const active = list.filter((e) => { const st = this._hass!.states[e].state; return st === "playing" || st === "paused" || st === "buffering"; });
+    const pool = active.length ? active : list;
+    return pool.slice().sort((a, b) => this._mScore(b) - this._mScore(a))[0];
+  }
+  private _mScore(e: string): number {
+    const a = this._hass!.states[e].attributes;
+    return (a.entity_picture ? 4 : 0) + (a.media_title ? 2 : 0) + (a.media_duration ? 1 : 0);
+  }
   // rooms without a `media` entity render nothing; playing → top hero, idle → bottom strip
   private _mediaMode(): "hero" | "strip" | null {
-    const m = this.config.media; if (!m) return null;
-    const st = this._hass?.states[m]?.state;
-    if (!st) return null;
+    const m = this._mediaEntity(); if (!m) return null;
+    const st = this._hass!.states[m].state;
     if (st === "playing" || st === "paused" || st === "buffering") return "hero";
     if (st === "off" || st === "unavailable" || st === "standby") return null;
     return "strip";
+  }
+  private _clock(sec: number): string {
+    sec = Math.max(0, Math.floor(sec));
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
   }
   private _mFields(m: string) {
     const s = this._hass!.states[m]; const a = s.attributes;
@@ -248,10 +309,12 @@ export class RoomCard extends LitElement {
       playing: s.state === "playing",
       art: a.entity_picture as string | undefined,
       title: a.media_title || (s.state === "idle" ? "Idle" : a.app_name || a.source || "On"),
-      sub: a.media_artist || a.media_series_title || "",
-      third: a.media_album_name || (a.media_title ? a.app_name || a.source || "" : ""),
+      sub: a.media_artist || a.media_series_title || a.app_name || a.source || "",
+      third: a.media_album_name || a.media_season || "",
       feat: Number(a.supported_features ?? 0),
+      pos: posv, dur,
       prog: dur > 0 ? Math.min(100, Math.max(0, (posv / dur) * 100)) : undefined,
+      time: dur > 0 ? `${this._clock(posv)} / ${this._clock(dur)}` : "",
     };
   }
   private _mCtl(m: string, f: { feat: number; playing: boolean }, cls: string) {
@@ -261,7 +324,7 @@ export class RoomCard extends LitElement {
       ${f.feat & 32 ? html`<button class="${cls}" @click=${() => this._mediaSvc(m, "media_next_track")} aria-label="Next"><ha-icon icon="mdi:skip-next"></ha-icon></button>` : nothing}`;
   }
   private _mediaHero(): TemplateResult | typeof nothing {
-    const m = this.config.media; if (!m) return nothing;
+    const m = this._mediaEntity(); if (!m) return nothing;
     const f = this._mFields(m);
     const bg = f.art ? { backgroundImage: `linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.2) 58%, rgba(0,0,0,.45)), url("${f.art}")` } : {};
     return html`<div class="mhero ${classMap({ hasart: !!f.art })}" style=${styleMap(bg)}>
@@ -269,7 +332,7 @@ export class RoomCard extends LitElement {
       <button class="mhtap" @click=${() => moreInfo(this, m)} aria-label="Open media"></button>
       <div class="mhcontent">
         <div class="mhmeta">
-          <div class="mhwhere"><span class="eq live"><i></i><i></i><i></i></span>Now playing</div>
+          <div class="mhwhere"><span class="eq live"><i></i><i></i><i></i></span>Now playing${f.time ? html` · <span class="mhtime">${f.time}</span>` : nothing}</div>
           <div class="mht">${f.title}</div>
           ${f.sub ? html`<div class="mhsub">${f.sub}</div>` : nothing}
           ${f.third && f.third !== f.sub ? html`<div class="mhthird">${f.third}</div>` : nothing}
@@ -280,7 +343,7 @@ export class RoomCard extends LitElement {
     </div>`;
   }
   private _mediaStrip(): TemplateResult | typeof nothing {
-    const m = this.config.media; if (!m) return nothing;
+    const m = this._mediaEntity(); if (!m) return nothing;
     const f = this._mFields(m);
     return html`<div class="media">
       <button class="mart ph" @click=${() => moreInfo(this, m)}><span class="eq ${classMap({ live: f.playing })}"><i></i><i></i><i></i></span></button>
@@ -366,7 +429,9 @@ export class RoomCard extends LitElement {
         color-mix(in oklab, var(--hl-amber) 36%, #fff) 0, color-mix(in oklab, var(--hl-amber) 36%, #fff) var(--bri, 100%),
         color-mix(in oklab, var(--hl-amber) 12%, #fff) var(--bri, 100%));
       box-shadow: inset 0 1px 0 rgb(255 255 255 / .5), 0 2px 6px rgb(184 124 0 / .22); transition: background .35s var(--hl-settle), box-shadow .28s var(--hl-settle); }
-    .pt { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 42px; padding: 0 13px; font-size: 12.5px; font-weight: 550; color: color-mix(in srgb, var(--primary-text-color) 70%, transparent); transition: color .28s ease; }
+    .pt { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 42px; padding: 0 13px; font-size: 12.5px; font-weight: 550; color: color-mix(in srgb, var(--primary-text-color) 70%, transparent); transition: color .28s ease; touch-action: pan-y; }
+    .pill.sliding { transition: none !important; }
+    .pill.sliding .pt { color: var(--hl-ink-on-amber); }
     .pt .pn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pb { margin-left: auto; padding-left: 8px; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--hl-ink-on-amber); opacity: .8; flex: 0 0 auto; }
     .pb.off { color: var(--hl-text-3); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .04em; opacity: 1; }
@@ -468,6 +533,7 @@ export class RoomCard extends LitElement {
     .mhmeta { min-width: 0; }
     .mhwhere { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: color-mix(in srgb, var(--hl-amber) 62%, #fff); text-shadow: 0 1px 3px rgb(0 0 0 / .7); }
     .mhwhere .eq { height: 9px; gap: 1.5px; } .mhwhere .eq i { width: 2px; height: 50%; background: currentColor; border-radius: 1px; }
+    .mhtime { font-variant-numeric: tabular-nums; font-weight: 700; opacity: .9; }
     .mht { font-size: 16px; font-weight: 750; letter-spacing: -.01em; color: #fff; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 4px rgb(0 0 0 / .7); }
     .mhsub { font-size: 12.5px; color: rgb(255 255 255 / .85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgb(0 0 0 / .7); }
     .mhthird { font-size: 11px; color: rgb(255 255 255 / .6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgb(0 0 0 / .7); }
