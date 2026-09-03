@@ -9,8 +9,9 @@ import "./cards/needs-attention-card";
 import "./cards/laundry-tracker-card";
 import "./cards/vacuum-card";
 import "./cards/feeder-card";
+import "./cards/room-card";
 
-const VERSION = "0.10.1";
+const VERSION = "0.11.0";
 // eslint-disable-next-line no-console
 console.info(
   `%c HOMELAB-LOVELACE-CARDS %c v${VERSION} `,
