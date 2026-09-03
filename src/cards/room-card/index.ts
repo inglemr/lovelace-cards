@@ -51,11 +51,28 @@ export class RoomCard extends LitElement {
   private _slideEntity?: string;
   private _slideStartX = 0;
   private _slideMoved = false;
+  private _sliding = false;
   private _slideThrottle = 0;
   private _slideLast?: number;
+  private _settleEntity?: string;
+  private _settlePct?: number;
 
-  set hass(h: HomeAssistant) { this._hass = h; this.toggleAttribute("dark", !!(h?.themes as any)?.darkMode); this.requestUpdate(); }
+  set hass(h: HomeAssistant) {
+    this._hass = h;
+    this.toggleAttribute("dark", !!(h?.themes as any)?.darkMode);
+    // release the post-slide guard once the light actually reports the target brightness
+    if (this._settleEntity && !this._sliding) {
+      const st = h?.states[this._settleEntity];
+      const cur = this._briPct(this._settleEntity);
+      if (!st || st.state !== "on" || this._settlePct == null || Math.abs(cur - this._settlePct) <= 3) {
+        this._settleEntity = undefined; this._settlePct = undefined;
+      }
+    }
+    this.requestUpdate();
+  }
   get hass(): HomeAssistant | undefined { return this._hass; }
+  // don't let re-renders clobber the fill mid-drag (or before the light catches up) — that's the rubber-band
+  protected shouldUpdate(): boolean { return !this._sliding && !this._settleEntity; }
 
   static getStubConfig(): RoomCardConfig { return { type: "custom:homelab-room-card", name: "Room", lights: [] }; }
   setConfig(config: RoomCardConfig): void {
@@ -125,13 +142,13 @@ export class RoomCard extends LitElement {
   private _chipMove(entity: string, e: PointerEvent) {
     if (this._slideEntity !== entity) return;
     if (!this._slideMoved && Math.abs(e.clientX - this._slideStartX) < 6) return;
-    this._slideMoved = true;
+    this._slideMoved = true; this._sliding = true; // _sliding blocks re-renders (shouldUpdate)
     const pill = (e.currentTarget as HTMLElement).closest(".pill") as HTMLElement | null;
     if (!pill) return;
     const r = pill.getBoundingClientRect();
     const pct = clamp(Math.round(((e.clientX - r.left) / r.width) * 100), 1, 100);
     this._slideLast = pct;
-    pill.style.setProperty("--bri", `${pct}%`);
+    pill.style.setProperty("--bri", `${pct}%`);   // drive the fill imperatively (no re-render)
     pill.classList.add("on", "sliding");
     const now = Date.now();
     if (now - this._slideThrottle > 180) { this._slideThrottle = now; this._hass?.callService("light", "turn_on", { entity_id: entity, brightness_pct: pct }); }
@@ -141,8 +158,13 @@ export class RoomCard extends LitElement {
     this._slideEntity = undefined;
     const pill = (e.currentTarget as HTMLElement).closest(".pill") as HTMLElement | null;
     pill?.classList.remove("sliding");
+    this._sliding = false;
     if (this._slideMoved && this._slideLast != null) {
-      this._hass?.callService("light", "turn_on", { entity_id: entity, brightness_pct: this._slideLast });
+      const pct = this._slideLast;
+      this._hass?.callService("light", "turn_on", { entity_id: entity, brightness_pct: pct });
+      // hold the fill at the target (blocking re-render) until the light reports it back — kills the jump-back
+      this._settleEntity = entity; this._settlePct = pct;
+      window.setTimeout(() => { if (this._settleEntity === entity) { this._settleEntity = undefined; this._settlePct = undefined; this.requestUpdate(); } }, 1500);
     }
   }
 
