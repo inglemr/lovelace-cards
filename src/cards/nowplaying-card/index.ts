@@ -152,6 +152,7 @@ export class NowPlayingCard extends LitElement {
       background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep));
       box-shadow: inset 0 1px 0 rgb(255 255 255 / .4), 0 4px 12px rgb(245 179 1 / .35); }
     .c.play ha-icon { --mdc-icon-size: 24px; }
+    :host([dark]) .c.play { color: var(--hl-ink-on-amber); background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 4px 12px rgb(245 179 1 / .4); }
 
     .vol { display: flex; align-items: center; gap: 6px; flex: 1; margin-left: 6px; min-width: 60px; }
     .vol ha-icon { --mdc-icon-size: 18px; color: var(--hl-text-3); }

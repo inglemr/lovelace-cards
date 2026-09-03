@@ -152,6 +152,11 @@ export class SecurityCard extends LitElement {
     .dtext { font-size: 11px; font-weight: 700; color: var(--hl-text-2); }
     .doors.open { background: linear-gradient(180deg, color-mix(in oklab, var(--hl-amber) 18%, var(--card-background-color, #fff)), color-mix(in oklab, var(--hl-amber) 26%, var(--card-background-color, #fff))); }
     .doors.open ha-icon, .doors.open .dtext { color: var(--hl-ink-on-amber); }
+    /* dark: on-states must out-specify :host([dark]) base wells */
+    :host([dark]) .lock.locked { background: linear-gradient(180deg, color-mix(in oklab, #34d399 20%, var(--card-background-color, #16181d)), color-mix(in oklab, #34d399 30%, var(--card-background-color, #16181d))); box-shadow: inset 0 1px 0 rgb(255 255 255 / .1), 0 2px 8px rgb(16 120 80 / .25); }
+    :host([dark]) .lock.locked ha-icon { color: #4ade80; }
+    :host([dark]) .lock.locked .ltext small { color: color-mix(in srgb, #4ade80 75%, #fff); }
+    :host([dark]) .doors.open { background: linear-gradient(180deg, color-mix(in oklab, var(--hl-amber) 24%, var(--card-background-color, #16181d)), color-mix(in oklab, var(--hl-amber) 36%, var(--card-background-color, #16181d))); }
   `];
 }
 

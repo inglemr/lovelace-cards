@@ -331,6 +331,12 @@ export class RoomCard extends LitElement {
     .dot { width: 8px; height: 8px; border-radius: 999px; box-sizing: border-box; border: 1.5px solid color-mix(in srgb, var(--primary-text-color) 30%, transparent); background: transparent; transition: background .3s linear, border-color .3s linear, box-shadow .3s ease, transform .22s ease; }
     .dot.sq { border-radius: 2.5px; }
     .pill.on .dot { background: var(--dot-color, var(--hl-amber)); border-color: transparent; box-shadow: 0 0 6px color-mix(in srgb, var(--dot-color, var(--hl-amber)) 60%, transparent); animation: settle .22s ease; }
+    /* dark: on/lit states must out-specify the :host([dark]) off-well rules (":host()" inflates specificity) */
+    :host([dark]) ha-card.lit .key { background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 2px 8px rgb(184 124 0 / .35); }
+    :host([dark]) ha-card.lit .key ha-icon { color: var(--hl-ink-on-amber); }
+    :host([dark]) .power.on { background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); color: var(--hl-ink-on-amber); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 0 0 4px color-mix(in srgb, var(--hl-amber) 18%, transparent), 0 4px 12px rgb(245 179 1 / .4); }
+    :host([dark]) .pill.on { background: linear-gradient(180deg, color-mix(in oklab, var(--hl-amber) 26%, var(--card-background-color, #16181d)), color-mix(in oklab, var(--hl-amber) 40%, var(--card-background-color, #16181d))); box-shadow: inset 0 1px 0 rgb(255 255 255 / .1), 0 2px 8px rgb(245 179 1 / .18); }
+
     .tune { width: 40px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; border-left: 1px solid color-mix(in srgb, currentColor 14%, transparent); color: inherit; transition: background .22s ease; }
     .tune ha-icon { --mdc-icon-size: 15px; opacity: .55; }
     .tune.active { background: rgb(255 255 255 / .25); }
