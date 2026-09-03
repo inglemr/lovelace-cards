@@ -192,7 +192,7 @@ export class LaundryTrackerCard extends LitElement {
     }
     return html`
       <div class="appliance ${classMap({ running })}" @click=${() => this._more(a.power)}>
-        <ha-icon class="ai" icon=${a.icon ?? "mdi:washing-machine"}></ha-icon>
+        ${this._machineIcon(running)}
         <div class="mid">
           <div class="topline">
             <span class="name">${a.name}</span>
@@ -202,6 +202,26 @@ export class LaundryTrackerCard extends LitElement {
           <div class="detail">${detail}</div>
         </div>
       </div>
+    `;
+  }
+
+  // Front-loader icon whose DRUM is a separate group — only it spins while
+  // running, so the machine body stays put (a single mdi glyph can't do that).
+  private _machineIcon(running: boolean): TemplateResult {
+    return html`
+      <svg class=${classMap({ wm: true, running })} viewBox="0 0 24 24" role="img" aria-hidden="true">
+        <rect class="body" x="3" y="2" width="18" height="20" rx="2.6" />
+        <line class="panel" x1="3" y1="6.6" x2="21" y2="6.6" />
+        <circle class="knob" cx="6" cy="4.3" r="0.85" />
+        <circle class="knob" cx="9" cy="4.3" r="0.85" />
+        <circle class="port" cx="12" cy="14.5" r="6" />
+        <circle class="rim" cx="12" cy="14.5" r="4.3" />
+        <g class="drum">
+          <circle cx="12" cy="12.1" r="0.95" />
+          <circle cx="14.08" cy="15.7" r="0.95" />
+          <circle cx="9.92" cy="15.7" r="0.95" />
+        </g>
+      </svg>
     `;
   }
 
@@ -256,8 +276,15 @@ export class LaundryTrackerCard extends LitElement {
       border: 1px solid color-mix(in srgb, var(--primary-text-color) 8%, transparent);
       background: color-mix(in srgb, var(--primary-text-color) 4%, transparent); }
     .appliance.running { border-color: color-mix(in srgb, var(--lt-blue) 40%, transparent); background: color-mix(in srgb, var(--lt-blue) 9%, transparent); }
-    .ai { --mdc-icon-size: 26px; flex: 0 0 auto; color: color-mix(in srgb, var(--primary-text-color) 55%, transparent); }
-    .appliance.running .ai { color: var(--lt-blue); animation: spin 3.5s linear infinite; }
+    .wm { width: 27px; height: 27px; flex: 0 0 auto; color: color-mix(in srgb, var(--primary-text-color) 55%, transparent); }
+    .wm .body, .wm .port, .wm .rim, .wm .panel { fill: none; stroke: currentColor; stroke-width: 1.4; }
+    .wm .rim { stroke-width: 1.1; opacity: 0.55; }
+    .wm .panel { stroke-width: 1.4; }
+    .wm .knob, .wm .drum circle { fill: currentColor; stroke: none; }
+    .wm.running { color: var(--lt-blue); }
+    /* only the drum group spins — the machine body stays put */
+    .wm .drum { transform-box: view-box; transform-origin: 12px 14.5px; }
+    .wm.running .drum { animation: spin 1.6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .mid { flex: 1; min-width: 0; }
     .topline { display: flex; align-items: baseline; gap: 8px; }
