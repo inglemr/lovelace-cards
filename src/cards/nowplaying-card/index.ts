@@ -11,6 +11,8 @@ interface NowPlayingConfig extends LovelaceCardConfig {
   type: string;
   players?: string[]; // candidate media_players; default = auto-detect all
   exclude?: string[]; // entity ids to ignore
+  compact?: boolean; // slim hero strip (tap → media_path); renders nothing when idle
+  media_path?: string; // navigation target for the compact strip (default /lovelace/media)
 }
 
 const ACTIVE = new Set(["playing", "paused", "buffering"]);
@@ -64,6 +66,8 @@ export class NowPlayingCard extends LitElement {
   render() {
     if (!this.config || !this._hass) return nothing;
     const id = this._active();
+    // compact hero strip: nothing when idle (so the hero collapses), else a slim tap-through row
+    if (this.config.compact) return id ? this._compact(id) : nothing;
     if (!id) return this._empty();
     const st = this._hass.states[id];
     const a = st.attributes;
@@ -110,6 +114,27 @@ export class NowPlayingCard extends LitElement {
       <div class="et">Nothing playing</div>
       <div class="es">Start something from a room below, or say the word.</div>
     </ha-card>`;
+  }
+
+  private _compact(id: string): TemplateResult {
+    const a = this._hass!.states[id].attributes;
+    const playing = this._hass!.states[id].state === "playing";
+    const art = a.entity_picture || undefined;
+    const title = a.media_title || a.friendly_name || "Playing";
+    const room = a.friendly_name || "";
+    return html`<ha-card class="strip">
+      <button class="cnav" @click=${() => this._go()}>
+        <span class="cart ${classMap({ ph: !art })}" style=${styleMap(art ? { backgroundImage: `url("${art}")` } : {})}>${art ? nothing : html`<ha-icon icon="mdi:music"></ha-icon>`}</span>
+        <span class="cmeta"><span class="ct">${title}</span><span class="cr"><span class="eq"><i></i><i></i><i></i></span>${room}</span></span>
+      </button>
+      <button class="cplay" @click=${() => this._svc("media_play_pause")}><ha-icon icon=${playing ? "mdi:pause" : "mdi:play"}></ha-icon></button>
+    </ha-card>`;
+  }
+
+  private _go() {
+    const path = this.config.media_path || "/lovelace/media";
+    history.pushState(null, "", path);
+    this.dispatchEvent(new Event("location-changed", { bubbles: true, composed: true }));
   }
 
   static styles = [hearth, css`
@@ -164,6 +189,25 @@ export class NowPlayingCard extends LitElement {
     ha-card.empty ha-icon { --mdc-icon-size: 34px; color: var(--hl-text-3); }
     .et { font-size: 15px; font-weight: 700; }
     .es { font-size: 12.5px; color: var(--hl-text-3); max-width: 240px; }
+
+    /* compact hero strip */
+    ha-card.strip { padding: 8px; display: flex; align-items: center; gap: 8px; }
+    .cnav { -webkit-appearance: none; appearance: none; border: none; background: none; cursor: pointer; color: inherit;
+      display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; text-align: left; padding: 2px; border-radius: 12px; transition: transform var(--hl-d1) var(--hl-shift); }
+    .cnav:active { transform: scale(.98); }
+    .cart { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 10px; background-size: cover; background-position: center;
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1), 0 4px 10px -4px rgb(var(--hl-ember) / .4); display: flex; align-items: center; justify-content: center; }
+    .cart.ph { background: color-mix(in oklab, rgb(var(--hl-ember)) 6%, var(--card-background-color, #fff)); }
+    .cart.ph ha-icon { --mdc-icon-size: 20px; color: var(--hl-text-3); }
+    .cmeta { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+    .ct { font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cr { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: color-mix(in srgb, var(--hl-amber) 55%, var(--primary-text-color)); }
+    .cplay { -webkit-appearance: none; appearance: none; border: none; cursor: pointer; flex: 0 0 auto; width: 40px; height: 40px; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center; color: var(--hl-ink-on-amber);
+      background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .4), 0 4px 12px rgb(245 179 1 / .35);
+      transition: transform var(--hl-d1) var(--hl-shift); }
+    .cplay ha-icon { --mdc-icon-size: 22px; }
+    .cplay:active { transform: scale(.9); }
   `];
 }
 
