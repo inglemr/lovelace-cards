@@ -166,9 +166,11 @@ export class BatteryFleetCard extends LitElement {
 
   private _fmtDays(d?: number): string {
     if (d === undefined) return "";
-    if (d > 365) return "~1y+";
-    if (d > 60) return `~${Math.round(d / 30)}mo`;
-    return `~${Math.round(d)}d`;
+    if (d > 365) return "about a year";
+    if (d > 60) return `~${Math.round(d / 30)} months`;
+    if (d > 13) return `~${Math.round(d / 7)} weeks`;
+    if (d > 1.5) return `~${Math.round(d)} days`;
+    return "about a day";
   }
 
   render() {
@@ -183,7 +185,7 @@ export class BatteryFleetCard extends LitElement {
           <span class="spacer"></span>
           <span class="summary ${sum.tone}">${sum.tone === "ok" ? html`<ha-icon icon="mdi:check-circle"></ha-icon>` : nothing}${sum.text}</span>
         </div>
-        ${rows.length ? html`<div class="list">${rows.map((r) => this._row(r))}</div>` : html`<div class="empty">No battery devices configured</div>`}
+        ${rows.length ? html`<div class="list">${rows.map((r) => this._row(r))}</div>` : html`<div class="empty">No battery devices yet</div>`}
       </ha-card>
     `;
   }

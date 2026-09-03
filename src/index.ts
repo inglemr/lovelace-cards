@@ -11,7 +11,7 @@ import "./cards/vacuum-card";
 import "./cards/feeder-card";
 import "./cards/room-card";
 
-const VERSION = "0.16.1";
+const VERSION = "0.16.2";
 // eslint-disable-next-line no-console
 console.info(
   `%c HOMELAB-LOVELACE-CARDS %c v${VERSION} `,

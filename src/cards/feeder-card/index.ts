@@ -161,7 +161,7 @@ export class FeederCard extends LitElement {
           </div>
           ${desiccant !== undefined
             ? html`<div class="stat" @click=${() => this._more(c.desiccant)}>
-                <div class="sk">Desiccant</div>
+                <div class="sk">Freshness pack</div>
                 <div class=${classMap({ sv: true, warn: desiccant < 14 })}>${Math.round(desiccant)} <small>days</small></div>
               </div>`
             : nothing}
@@ -169,7 +169,7 @@ export class FeederCard extends LitElement {
 
         ${portion !== undefined && !isUnknown(this._hass, c.portion)
           ? html`<div class="portion">
-              <span class="pk">Manual portion</span>
+              <span class="pk">Extra portion</span>
               <div class="stepper">
                 <button @click=${() => this._setPortion(-1)}><ha-icon icon="mdi:minus"></ha-icon></button>
                 <span class="pv">${Math.round(portion)} g</span>

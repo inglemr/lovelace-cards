@@ -183,7 +183,7 @@ export class LaundryTrackerCard extends LitElement {
         const left = c.avgMs - elapsed;
         detail = left > 60000 ? `running ${fmtDur(elapsed)} · ~${fmtDur(left)} left` : `running ${fmtDur(elapsed)} · finishing…`;
       } else {
-        detail = elapsed ? `running ${fmtDur(elapsed)} · learning cycle length…` : `running · learning cycle length…`;
+        detail = elapsed ? `running ${fmtDur(elapsed)} · learning how long it takes…` : `running · learning how long it takes…`;
       }
     } else if (c?.lastEnd) {
       detail = `idle · last run ${fmtDur(Date.now() - c.lastEnd)} ago`;

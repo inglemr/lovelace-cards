@@ -62,10 +62,10 @@ export class VacuumCard extends LitElement {
     const s = (this._st()?.state ?? "").toLowerCase();
     if (CLEANING.has(s) || this._attr("running")) return { key: "cleaning", label: "Cleaning", active: true, docked: false };
     if (s === "paused" || this._attr("paused")) return { key: "paused", label: "Paused", active: true, docked: false };
-    if (s === "returning" || this._attr("returning")) return { key: "returning", label: "Returning to dock", active: true, docked: false };
+    if (s === "returning" || this._attr("returning")) return { key: "returning", label: "Heading home", active: true, docked: false };
     if (s === "error") return { key: "error", label: "Error", active: false, docked: false };
     if (s === "docked" || this._attr("charging")) {
-      return { key: "docked", label: this._attr("charging") ? "Charging" : "Docked", active: false, docked: true };
+      return { key: "docked", label: this._attr("charging") ? "Charging" : "On the dock", active: false, docked: true };
     }
     return { key: "idle", label: s ? s.replace(/_/g, " ").replace(/^\w/, (m) => m.toUpperCase()) : "Idle", active: false, docked: true };
   }
@@ -137,11 +137,11 @@ export class VacuumCard extends LitElement {
         const left = this.avgMin - elapsed;
         bits.push(left > 1 ? `~${fmtMin(left)} left` : "finishing…");
       } else if (ph.key === "cleaning" && elapsed !== undefined && !this.avgMin) {
-        bits.push("learning cycle length…");
+        bits.push("getting to know how long it takes…");
       }
       detail = bits.join(" · ");
     } else if (ph.key === "docked") {
-      detail = room ? `at dock · last in ${room}` : "at dock";
+      detail = room ? `On its dock · last cleaned ${room}` : "On its dock";
     } else if (ph.key === "error") {
       detail = typeof err === "string" && err && err !== "none" ? err : "needs attention";
     }
@@ -178,16 +178,16 @@ export class VacuumCard extends LitElement {
 
   private _controls(ph: { key: string; active: boolean; docked: boolean }): TemplateResult {
     if (ph.key === "cleaning") {
-      return html`${this._btn("mdi:pause", "Pause", "pause")}${this._btn("mdi:home-import-outline", "Send home", "return_to_base")}`;
+      return html`${this._btn("mdi:pause", "Pause", "pause")}${this._btn("mdi:home-import-outline", "Go home", "return_to_base")}`;
     }
     if (ph.key === "paused") {
-      return html`${this._btn("mdi:play", "Resume", "start", true)}${this._btn("mdi:home-import-outline", "Send home", "return_to_base")}`;
+      return html`${this._btn("mdi:play", "Resume", "start", true)}${this._btn("mdi:home-import-outline", "Go home", "return_to_base")}`;
     }
     if (ph.key === "returning") {
       return html`${this._btn("mdi:play", "Resume clean", "start")}${this._btn("mdi:stop", "Stop", "stop")}`;
     }
     // docked / idle / error
-    return html`${this._btn("mdi:broom", "Start clean", "start", true)}${this._btn("mdi:crosshairs-gps", "Locate", "locate")}`;
+    return html`${this._btn("mdi:broom", "Clean now", "start", true)}${this._btn("mdi:crosshairs-gps", "Locate", "locate")}`;
   }
 
   private _more(e: string) {
