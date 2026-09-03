@@ -162,12 +162,15 @@ export class RoomCard extends LitElement {
           ${total ? html`<button class="power ${classMap({ on: anyOn })}" @click=${(e: Event) => this._toggleAll(e)} aria-label="Toggle ${c.name} lights"><svg viewBox="0 0 24 24" width="16" height="16"><path d=${POWER_PATH} fill="currentColor"></path></svg></button>` : nothing}
         </div>
 
+        ${this._mediaMode() === "hero" ? this._mediaHero() : nothing}
+
         ${this._lights.length ? html`<div class="pills">
           ${this._lights.map((l) => {
             const on = this._isOn(l.entity);
             const offline = !this._isPresent(l.entity);
             const active = this._editEntity === l.entity;
-            return html`<div class="pill ${classMap({ on, offline })}" role="group">
+            const bri = on ? (this._isSwitch(l.entity) ? 100 : this._briPct(l.entity)) : 100;
+            return html`<div class="pill ${classMap({ on, offline })}" role="group" style=${styleMap({ "--bri": `${bri}%` })}>
               <button class="pt" @click=${(e: Event) => this._toggleOne(l.entity, e)}>
                 <span class="dot ${classMap({ sq: this._isSwitch(l.entity) })}" style=${styleMap(on ? { "--dot-color": this._dotColor(l.entity) } : {})}></span><span class="pn">${this._shortName(l)}</span>
                 ${offline ? html`<span class="pb off">offline</span>` : on && this._canTune(l.entity) ? html`<span class="pb">${this._briPct(l.entity)}%</span>` : nothing}
@@ -177,7 +180,7 @@ export class RoomCard extends LitElement {
           })}
         </div>` : nothing}
 
-        ${this._renderMedia()}
+        ${this._mediaMode() === "strip" ? this._mediaStrip() : nothing}
         ${this._renderSheet()}
       </ha-card>
     `;
@@ -229,27 +232,60 @@ export class RoomCard extends LitElement {
     `;
   }
 
-  // rooms without a `media` entity simply render nothing here
-  private _renderMedia(): TemplateResult | typeof nothing {
+  // rooms without a `media` entity render nothing; playing → top hero, idle → bottom strip
+  private _mediaMode(): "hero" | "strip" | null {
+    const m = this.config.media; if (!m) return null;
+    const st = this._hass?.states[m]?.state;
+    if (!st) return null;
+    if (st === "playing" || st === "paused" || st === "buffering") return "hero";
+    if (st === "off" || st === "unavailable" || st === "standby") return null;
+    return "strip";
+  }
+  private _mFields(m: string) {
+    const s = this._hass!.states[m]; const a = s.attributes;
+    const dur = Number(a.media_duration) || 0; const posv = Number(a.media_position) || 0;
+    return {
+      playing: s.state === "playing",
+      art: a.entity_picture as string | undefined,
+      title: a.media_title || (s.state === "idle" ? "Idle" : a.app_name || a.source || "On"),
+      sub: a.media_artist || a.media_series_title || "",
+      third: a.media_album_name || (a.media_title ? a.app_name || a.source || "" : ""),
+      feat: Number(a.supported_features ?? 0),
+      prog: dur > 0 ? Math.min(100, Math.max(0, (posv / dur) * 100)) : undefined,
+    };
+  }
+  private _mCtl(m: string, f: { feat: number; playing: boolean }, cls: string) {
+    return html`
+      ${f.feat & 16 ? html`<button class="${cls}" @click=${() => this._mediaSvc(m, "media_previous_track")} aria-label="Previous"><ha-icon icon="mdi:skip-previous"></ha-icon></button>` : nothing}
+      ${f.feat & 16385 ? html`<button class="${cls} play" @click=${() => this._mediaSvc(m, "media_play_pause")} aria-label="Play or pause"><ha-icon icon=${f.playing ? "mdi:pause" : "mdi:play"}></ha-icon></button>` : nothing}
+      ${f.feat & 32 ? html`<button class="${cls}" @click=${() => this._mediaSvc(m, "media_next_track")} aria-label="Next"><ha-icon icon="mdi:skip-next"></ha-icon></button>` : nothing}`;
+  }
+  private _mediaHero(): TemplateResult | typeof nothing {
     const m = this.config.media; if (!m) return nothing;
-    const s = this._hass?.states[m];
-    if (!s || s.state === "off" || s.state === "unavailable" || s.state === "standby") return nothing;
-    const playing = s.state === "playing";
-    const a = s.attributes;
-    const art = a.entity_picture as string | undefined;
-    const title = a.media_title || (s.state === "idle" ? "Idle" : a.app_name || a.source || "On");
-    const sub = a.media_artist || a.media_series_title || (a.media_title ? a.app_name || a.source || "" : "");
-    const feat = Number(a.supported_features ?? 0);
+    const f = this._mFields(m);
+    const bg = f.art ? { backgroundImage: `linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.2) 58%, rgba(0,0,0,.45)), url("${f.art}")` } : {};
+    return html`<div class="mhero ${classMap({ hasart: !!f.art })}" style=${styleMap(bg)}>
+      ${f.art ? nothing : html`<span class="mhviz"><span class="eq live"><i></i><i></i><i></i><i></i><i></i></span></span>`}
+      <button class="mhtap" @click=${() => moreInfo(this, m)} aria-label="Open media"></button>
+      <div class="mhcontent">
+        <div class="mhmeta">
+          <div class="mhwhere"><span class="eq live"><i></i><i></i><i></i></span>Now playing</div>
+          <div class="mht">${f.title}</div>
+          ${f.sub ? html`<div class="mhsub">${f.sub}</div>` : nothing}
+          ${f.third && f.third !== f.sub ? html`<div class="mhthird">${f.third}</div>` : nothing}
+        </div>
+        <div class="mhctl">${this._mCtl(m, f, "mhb")}</div>
+      </div>
+      ${f.prog !== undefined ? html`<div class="mhprog"><div class="mhpf" style=${styleMap({ width: `${f.prog}%` })}></div></div>` : nothing}
+    </div>`;
+  }
+  private _mediaStrip(): TemplateResult | typeof nothing {
+    const m = this.config.media; if (!m) return nothing;
+    const f = this._mFields(m);
     return html`<div class="media">
-      <button class="mart ${classMap({ ph: !art })}" @click=${() => moreInfo(this, m)} style=${styleMap(art ? { backgroundImage: `url("${art}")` } : {})}>
-        ${art ? nothing : html`<span class="eq ${classMap({ live: playing })}"><i></i><i></i><i></i></span>`}
-      </button>
-      <button class="mmeta" @click=${() => moreInfo(this, m)}>
-        <span class="mt">${title}</span>${sub ? html`<span class="msub">${sub}</span>` : nothing}
-      </button>
-      ${feat & 16 ? html`<button class="mctl" @click=${() => this._mediaSvc(m, "media_previous_track")} aria-label="Previous"><ha-icon icon="mdi:skip-previous"></ha-icon></button>` : nothing}
-      ${feat & 16385 ? html`<button class="mctl play" @click=${() => this._mediaSvc(m, "media_play_pause")} aria-label="Play or pause"><ha-icon icon=${playing ? "mdi:pause" : "mdi:play"}></ha-icon></button>` : nothing}
-      ${feat & 32 ? html`<button class="mctl" @click=${() => this._mediaSvc(m, "media_next_track")} aria-label="Next"><ha-icon icon="mdi:skip-next"></ha-icon></button>` : nothing}
+      <button class="mart ph" @click=${() => moreInfo(this, m)}><span class="eq ${classMap({ live: f.playing })}"><i></i><i></i><i></i></span></button>
+      <button class="mmeta" @click=${() => moreInfo(this, m)}><span class="mt">${f.title}</span>${f.sub ? html`<span class="msub">${f.sub}</span>` : nothing}</button>
+      ${this._mCtl(m, f, "mctl")}
     </div>`;
   }
   private _mediaSvc(entity: string, service: string) { this._hass?.callService("media_player", service, { entity_id: entity }); }
@@ -325,8 +361,11 @@ export class RoomCard extends LitElement {
       background: color-mix(in oklab, rgb(var(--hl-ember)) 5%, var(--card-background-color, #fff)); box-shadow: inset 0 1.5px 3px rgb(var(--hl-ember) / .07), inset 0 -1px 0 rgb(255 255 255 / .5);
       transition: background .28s var(--hl-settle), box-shadow .28s var(--hl-settle); }
     :host([dark]) .pill { background: color-mix(in oklab, black 20%, var(--card-background-color, #16181d)); box-shadow: inset 0 1.5px 3px rgb(0 0 0 / .35); }
-    .pill.on { background: linear-gradient(180deg, color-mix(in oklab, var(--hl-amber) 22%, var(--card-background-color, #fff)), color-mix(in oklab, var(--hl-amber) 32%, var(--card-background-color, #fff)));
-      box-shadow: inset 0 1px 0 rgb(255 255 255 / .5), 0 2px 6px rgb(184 124 0 / .22); }
+    /* on-chip is a horizontal brightness gauge: bright amber up to --bri, dim amber beyond */
+    .pill.on { background: linear-gradient(90deg,
+        color-mix(in oklab, var(--hl-amber) 36%, #fff) 0, color-mix(in oklab, var(--hl-amber) 36%, #fff) var(--bri, 100%),
+        color-mix(in oklab, var(--hl-amber) 12%, #fff) var(--bri, 100%));
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / .5), 0 2px 6px rgb(184 124 0 / .22); transition: background .35s var(--hl-settle), box-shadow .28s var(--hl-settle); }
     .pt { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 42px; padding: 0 13px; font-size: 12.5px; font-weight: 550; color: color-mix(in srgb, var(--primary-text-color) 70%, transparent); transition: color .28s ease; }
     .pt .pn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pb { margin-left: auto; padding-left: 8px; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--hl-ink-on-amber); opacity: .8; flex: 0 0 auto; }
@@ -344,7 +383,10 @@ export class RoomCard extends LitElement {
     :host([dark]) ha-card.lit .key { background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 2px 8px rgb(184 124 0 / .35); }
     :host([dark]) ha-card.lit .key ha-icon { color: var(--hl-ink-on-amber); }
     :host([dark]) .power.on { background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); color: var(--hl-ink-on-amber); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 0 0 4px color-mix(in srgb, var(--hl-amber) 18%, transparent), 0 4px 12px rgb(245 179 1 / .4); }
-    :host([dark]) .pill.on { background: linear-gradient(180deg, color-mix(in oklab, var(--hl-amber) 26%, var(--card-background-color, #16181d)), color-mix(in oklab, var(--hl-amber) 40%, var(--card-background-color, #16181d))); box-shadow: inset 0 1px 0 rgb(255 255 255 / .1), 0 2px 8px rgb(245 179 1 / .18); }
+    :host([dark]) .pill.on { background: linear-gradient(90deg,
+        color-mix(in oklab, var(--hl-amber) 42%, var(--card-background-color, #16181d)) 0, color-mix(in oklab, var(--hl-amber) 42%, var(--card-background-color, #16181d)) var(--bri, 100%),
+        color-mix(in oklab, var(--hl-amber) 12%, var(--card-background-color, #16181d)) var(--bri, 100%));
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / .1), 0 2px 8px rgb(245 179 1 / .18); }
 
     .tune { width: 40px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; border-left: 1px solid color-mix(in srgb, currentColor 14%, transparent); color: inherit; transition: background .22s ease; }
     .tune ha-icon { --mdc-icon-size: 15px; opacity: .55; }
@@ -408,6 +450,31 @@ export class RoomCard extends LitElement {
     .mctl:active { transform: scale(.9); }
     .mctl.play { color: var(--hl-ink-on-amber); background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 3px 10px rgb(245 179 1 / .35); }
     .mctl.play ha-icon { --mdc-icon-size: 21px; }
+
+    /* --- media HERO (top of card when playing) --- */
+    .mhero { position: relative; overflow: hidden; width: 100%; height: 122px; margin: 11px 0 2px; border-radius: 16px; background-size: cover; background-position: center;
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08), 0 8px 20px -10px rgb(var(--hl-ember) / .5); animation: hl-fade var(--hl-d3) var(--hl-settle) both; }
+    .mhero:not(.hasart) { background: linear-gradient(135deg, color-mix(in oklab, var(--hl-amber) 34%, #1a1206), color-mix(in oklab, var(--hl-amber) 12%, #0c0a06)); }
+    .mhviz { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: .4; }
+    .mhviz .eq { height: 48px; gap: 6px; }
+    .mhviz .eq i { width: 6px; height: 45%; background: var(--hl-amber); border-radius: 2px; }
+    .mhtap { position: absolute; inset: 0; width: 100%; height: 100%; background: none; border: none; cursor: pointer; }
+    .mhcontent { position: absolute; left: 14px; right: 12px; bottom: 12px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; pointer-events: none; }
+    .mhmeta { min-width: 0; }
+    .mhwhere { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: color-mix(in srgb, var(--hl-amber) 62%, #fff); text-shadow: 0 1px 3px rgb(0 0 0 / .7); }
+    .mhwhere .eq { height: 9px; gap: 1.5px; } .mhwhere .eq i { width: 2px; height: 50%; background: currentColor; border-radius: 1px; }
+    .mht { font-size: 16px; font-weight: 750; letter-spacing: -.01em; color: #fff; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 4px rgb(0 0 0 / .7); }
+    .mhsub { font-size: 12.5px; color: rgb(255 255 255 / .85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgb(0 0 0 / .7); }
+    .mhthird { font-size: 11px; color: rgb(255 255 255 / .6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgb(0 0 0 / .7); }
+    .mhctl { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; pointer-events: auto; }
+    .mhb { width: 36px; height: 36px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; border: none; cursor: pointer; color: #fff;
+      background: rgb(255 255 255 / .16); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); transition: transform var(--hl-d1) var(--hl-shift); }
+    .mhb ha-icon { --mdc-icon-size: 20px; }
+    .mhb:active { transform: scale(.9); }
+    .mhb.play { width: 46px; height: 46px; color: var(--hl-ink-on-amber); background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); box-shadow: 0 4px 14px rgb(245 179 1 / .5); }
+    .mhb.play ha-icon { --mdc-icon-size: 25px; }
+    .mhprog { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(255 255 255 / .18); }
+    .mhpf { height: 100%; background: var(--hl-amber); box-shadow: 0 0 8px var(--hl-amber); transition: width 1s linear; }
 
     button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
