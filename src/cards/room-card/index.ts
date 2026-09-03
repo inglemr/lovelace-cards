@@ -184,6 +184,7 @@ export class RoomCard extends LitElement {
             return html`<div class="pill ${classMap({ on })}" role="group">
               <button class="pt" @click=${(e: Event) => this._toggleOne(l.entity, e)}>
                 <span class="dot ${classMap({ sq: this._isSwitch(l.entity) })}" style=${styleMap(on ? { "--dot-color": this._dotColor(l.entity) } : {})}></span><span class="pn">${this._shortName(l)}</span>
+                ${on && this._canTune(l.entity) ? html`<span class="pb">${this._briPct(l.entity)}%</span>` : nothing}
               </button>
               ${this._canTune(l.entity) ? html`<button class="tune ${classMap({ active })}" @click=${(e: Event) => this._openEdit(l.entity, e)} aria-label="Tune ${this._shortName(l)}"><ha-icon icon="mdi:tune-variant"></ha-icon></button>` : nothing}
             </div>`;
@@ -313,21 +314,24 @@ export class RoomCard extends LitElement {
     .wellinput::-webkit-slider-thumb { -webkit-appearance: none; width: 44px; height: 44px; }
     .wellinput:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: inherit; }
 
-    .pills { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
-    .pill { display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden; border: none; min-height: 40px;
+    .pills { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+    .pill { display: flex; align-items: stretch; width: 100%; border-radius: 12px; overflow: hidden; border: none; min-height: 42px;
       background: color-mix(in oklab, rgb(var(--hl-ember)) 5%, var(--card-background-color, #fff)); box-shadow: inset 0 1.5px 3px rgb(var(--hl-ember) / .07), inset 0 -1px 0 rgb(255 255 255 / .5);
       transition: background .28s var(--hl-settle), box-shadow .28s var(--hl-settle); }
     :host([dark]) .pill { background: color-mix(in oklab, black 20%, var(--card-background-color, #16181d)); box-shadow: inset 0 1.5px 3px rgb(0 0 0 / .35); }
     .pill.on { background: linear-gradient(180deg, color-mix(in oklab, var(--hl-amber) 22%, var(--card-background-color, #fff)), color-mix(in oklab, var(--hl-amber) 32%, var(--card-background-color, #fff)));
       box-shadow: inset 0 1px 0 rgb(255 255 255 / .5), 0 2px 6px rgb(184 124 0 / .22); }
-    .pt { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 13px 0 11px; font-size: 12.5px; font-weight: 550; color: color-mix(in srgb, var(--primary-text-color) 70%, transparent); transition: color .28s ease; }
+    .pt { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 42px; padding: 0 13px; font-size: 12.5px; font-weight: 550; color: color-mix(in srgb, var(--primary-text-color) 70%, transparent); transition: color .28s ease; }
+    .pt .pn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pb { margin-left: auto; padding-left: 8px; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--hl-ink-on-amber); opacity: .8; flex: 0 0 auto; }
+    :host([dark]) .pill.on .pb { color: color-mix(in srgb, var(--hl-amber) 60%, #fff); }
     .pt .pn { transition: color .28s ease; }
     .pill.on .pt, .pill.on .pt .pn { color: var(--hl-ink-on-amber); }
     :host([dark]) .pill.on .pt, :host([dark]) .pill.on .pt .pn { color: color-mix(in srgb, var(--hl-amber) 60%, #fff); }
     .dot { width: 8px; height: 8px; border-radius: 999px; box-sizing: border-box; border: 1.5px solid color-mix(in srgb, var(--primary-text-color) 30%, transparent); background: transparent; transition: background .3s linear, border-color .3s linear, box-shadow .3s ease, transform .22s ease; }
     .dot.sq { border-radius: 2.5px; }
     .pill.on .dot { background: var(--dot-color, var(--hl-amber)); border-color: transparent; box-shadow: 0 0 6px color-mix(in srgb, var(--dot-color, var(--hl-amber)) 60%, transparent); animation: settle .22s ease; }
-    .tune { width: 34px; display: inline-flex; align-items: center; justify-content: center; border-left: 1px solid color-mix(in srgb, currentColor 14%, transparent); color: inherit; transition: background .22s ease; }
+    .tune { width: 40px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; border-left: 1px solid color-mix(in srgb, currentColor 14%, transparent); color: inherit; transition: background .22s ease; }
     .tune ha-icon { --mdc-icon-size: 15px; opacity: .55; }
     .tune.active { background: rgb(255 255 255 / .25); }
     .tune.active ha-icon { opacity: 1; }

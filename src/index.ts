@@ -15,7 +15,7 @@ import "./cards/litter-card";
 import "./cards/nowplaying-card";
 import "./cards/security-card";
 
-const VERSION = "0.18.2";
+const VERSION = "0.18.3";
 // eslint-disable-next-line no-console
 console.info(
   `%c HOMELAB-LOVELACE-CARDS %c v${VERSION} `,
