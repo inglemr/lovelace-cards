@@ -4,7 +4,7 @@ import { customElement, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { LovelaceCardConfig } from "custom-card-helpers";
 import type { HomeAssistant } from "../../shared/ha";
-import { moreInfo } from "../../shared/ha";
+import { moreInfo, entityPicture } from "../../shared/ha";
 
 interface CameraSrc {
   entity: string;
@@ -13,6 +13,8 @@ interface CameraSrc {
 interface CatStyle {
   color?: string;
   icon?: string;
+  photo?: string; // static url (e.g. /local/pets/tots.jpg)
+  image_entity?: string; // image./person. entity with a picture (e.g. image.thor_avatar)
 }
 interface PetActivityConfig extends LovelaceCardConfig {
   type: string;
@@ -34,8 +36,8 @@ const DEFAULT_CAMERAS: CameraSrc[] = [
   { entity: "sensor.petlibro_feeder_our_cats_object_classification", room: "Feeder" },
 ];
 const DEFAULT_CATS: Record<string, CatStyle> = {
-  Thor: { color: "orange", icon: "mdi:cat" },
-  Tots: { color: "deep-purple", icon: "mdi:cat" },
+  Thor: { color: "orange", icon: "mdi:cat", image_entity: "image.thor_avatar" },
+  Tots: { color: "deep-purple", icon: "mdi:cat", photo: "/local/pets/tots.jpg?v=20260903" },
 };
 
 type Ev = { cat: string; room: string; t: number };
@@ -47,6 +49,7 @@ export class PetActivityCard extends LitElement {
   private _loading = false;
   private _loadedKey = "";
   private _hass?: HomeAssistant;
+  private _imgFailed = new Set<string>(); // avatar urls that 404'd — fall back to the icon
 
   set hass(h: HomeAssistant) {
     this._hass = h;
@@ -86,6 +89,11 @@ export class PetActivityCard extends LitElement {
   private _accent(cat: string): string {
     const c = this._cats[cat]?.color ?? "grey";
     return NAMED[c] ?? c;
+  }
+  private _catImg(cat: string): string | undefined {
+    const st = this._cats[cat] ?? {};
+    const src = st.image_entity ? entityPicture(this._hass, st.image_entity) : st.photo;
+    return src && !this._imgFailed.has(src) ? src : undefined;
   }
 
   updated(): void {
@@ -168,9 +176,13 @@ export class PetActivityCard extends LitElement {
     return html`<div class="feed">
       ${this.events.map((e) => {
         const st = this._cats[e.cat] ?? {};
+        const img = this._catImg(e.cat);
+        const accent = this._accent(e.cat);
         return html`<div class="row" @click=${() => this._more(e)}>
-          <span class="dot" style=${styleMap({ background: `color-mix(in srgb, ${this._accent(e.cat)} 20%, transparent)`, color: this._accent(e.cat) })}>
-            <ha-icon icon=${st.icon ?? "mdi:cat"}></ha-icon>
+          <span class="dot ${img ? "has-img" : ""}" style=${styleMap({ background: `color-mix(in srgb, ${accent} 20%, transparent)`, color: accent, "--ring": accent })}>
+            ${img
+              ? html`<img src=${img} alt=${e.cat} @error=${() => { this._imgFailed.add(img); this.requestUpdate(); }} />`
+              : html`<ha-icon icon=${st.icon ?? "mdi:cat"}></ha-icon>`}
           </span>
           <span class="who">${e.cat}</span>
           <span class="where"><ha-icon icon="mdi:map-marker"></ha-icon>${e.room}</span>
@@ -202,8 +214,10 @@ export class PetActivityCard extends LitElement {
     .feed { display: flex; flex-direction: column; }
     .row { display: flex; align-items: center; gap: 10px; padding: 9px 4px; cursor: pointer; border-top: 1px solid color-mix(in srgb, var(--primary-text-color) 7%, transparent); }
     .row:first-child { border-top: none; }
-    .dot { width: 30px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    .dot { width: 30px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; overflow: hidden; }
     .dot ha-icon { --mdc-icon-size: 18px; }
+    .dot.has-img { background: none !important; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ring, var(--hl-amber)) 60%, transparent); }
+    .dot.has-img img { width: 100%; height: 100%; object-fit: cover; border-radius: 999px; display: block; }
     .who { font-size: 14px; font-weight: 700; }
     .where { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; color: color-mix(in srgb, var(--primary-text-color) 62%, transparent); }
     .where ha-icon { --mdc-icon-size: 14px; }
