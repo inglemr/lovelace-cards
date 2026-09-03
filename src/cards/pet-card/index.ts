@@ -39,6 +39,38 @@ const NAMED: Record<string, string> = {
 };
 type Pt = { t: number; v: number };
 
+/** Litter-Robot / scale weights are noisy — a single half-on-the-scale reading
+ * spikes the series. Median filter (kills lone spikes) then a moving average
+ * (gentle trend), window scaled to sample count. Returns a value per input point. */
+function smoothSeries(vs: number[]): number[] {
+  const n = vs.length;
+  if (n < 5) return vs.slice();
+  const med = vs.map((_, i) => {
+    const w = vs.slice(Math.max(0, i - 1), Math.min(n, i + 2)).sort((a, b) => a - b);
+    return w[Math.floor(w.length / 2)];
+  });
+  const half = Math.max(2, Math.round(n / 10));
+  return med.map((_, i) => {
+    let s = 0, c = 0;
+    for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) { s += med[j]; c++; }
+    return s / c;
+  });
+}
+
+/** Catmull-Rom → cubic bezier, so a smoothed series draws as a soft curve, not zig-zags. */
+function smoothPath(xy: number[][]): string {
+  if (xy.length < 2) return "";
+  if (xy.length === 2) return `M ${xy[0][0].toFixed(2)},${xy[0][1].toFixed(2)} L ${xy[1][0].toFixed(2)},${xy[1][1].toFixed(2)}`;
+  let d = `M ${xy[0][0].toFixed(2)},${xy[0][1].toFixed(2)}`;
+  for (let i = 0; i < xy.length - 1; i++) {
+    const p0 = xy[i - 1] || xy[i], p1 = xy[i], p2 = xy[i + 1], p3 = xy[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
+  }
+  return d;
+}
+
 @customElement("pet-card")
 export class PetCard extends LitElement {
   @state() private config!: PetCardConfig;
@@ -189,15 +221,15 @@ export class PetCard extends LitElement {
     const pts = this.hist?.pts ?? [];
     if (this.hist?.key === undefined) return html`<div class="spark loading"></div>`;
     if (pts.length < 2) return html`<div class="spark empty">weighing in…</div>`;
-    const vs = pts.map((p) => p.v);
+    const vs = smoothSeries(pts.map((p) => p.v)); // de-spike the noisy scale readings
     let lo = Math.min(...vs);
     let hi = Math.max(...vs);
     if (hi - lo < 0.2) { const m = (hi + lo) / 2; lo = m - 0.12; hi = m + 0.12; } // kg scale: avoid a flat-looking line
     const t0 = pts[0].t;
     const t1 = pts[pts.length - 1].t;
     const span = Math.max(1, t1 - t0);
-    const xy = pts.map((p) => [((p.t - t0) / span) * 100, 100 - ((p.v - lo) / (hi - lo)) * 100]);
-    const line = "M " + xy.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" L ");
+    const xy = pts.map((p, i) => [((p.t - t0) / span) * 100, 100 - ((vs[i] - lo) / (hi - lo)) * 100]);
+    const line = smoothPath(xy);
     const area = line + ` L 100,100 L 0,100 Z`;
     return html`<div class="spark">
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">

@@ -26,9 +26,10 @@ function prettyState(s: string): string {
 }
 function isCharging(s?: string): boolean {
   if (!s) return false;
-  const l = s.toLowerCase();
-  if (l.includes("ended") || l.includes("finished") || l.includes("complete")) return false;
-  return l.includes("charging") && !l.includes("not");
+  // whitelist genuinely-active states — substring matching breaks on "nocharging"
+  // ("charging" ⊂ "nocharging", and it contains no "not"), which read as charging.
+  const l = s.toLowerCase().replace(/[\s_-]/g, "");
+  return l === "charging" || l === "chargingactive" || l === "chargingstarted" || l === "chargingongoing" || l === "fastcharging" || l === "active";
 }
 function isSecured(s?: string): boolean {
   const l = (s ?? "").toLowerCase();
