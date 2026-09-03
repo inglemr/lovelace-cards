@@ -7,19 +7,19 @@ import type { HomeAssistant } from "../../shared/ha";
 import { moreInfo } from "../../shared/ha";
 import { calmDotColor, kelvinDotColor, hueToRgb, type RGB } from "../../shared/color";
 
-// v3 "Lightwell" + v3.1 per-light colour/tune.
-// GOVERNING RULE: hue is DATA, not atmosphere. A light's real hue may only be
-// painted in (1) the ≤8px pill dot (calm-clamped) and (2) an editor surface the
-// user explicitly opened. Never in card background, ambient glow, borders or
-// washes — those stay kelvin-warmth only, so the card can never read as an alert.
+// GOVERNING RULE: hue is DATA, not atmosphere. A light's real hue is painted only
+// in (1) the ≤8px pill dot (calm-clamped) and (2) the light-detail sheet the user
+// opens. Card background/ambient/washes stay kelvin-warmth — never an alert.
 const WARM = "#f2a93b";
 const COOL = "#ffe8c2";
 const CURATED: { name: string; hex: string }[] = [
   { name: "Ember", hex: "#e8543f" },
   { name: "Sunset", hex: "#f59632" },
+  { name: "Gold", hex: "#e8c53f" },
   { name: "Fern", hex: "#4fa863" },
   { name: "Lagoon", hex: "#2fa8c7" },
   { name: "Twilight", hex: "#5b6fd4" },
+  { name: "Orchid", hex: "#b45bd4" },
 ];
 const RGB_MODES = ["rgb", "rgbw", "rgbww", "hs", "xy"];
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -44,11 +44,11 @@ export class RoomCard extends LitElement {
   @state() private _dragVal?: number;
   @state() private _dragging = false;
   @state() private _editEntity?: string;
-  @state() private _closing = false;
   @state() private _editBri?: number;
   @state() private _custom = false;
   private _hass?: HomeAssistant;
   private _throttle = 0;
+  private _vDrag = false;
 
   set hass(h: HomeAssistant) { this._hass = h; this.requestUpdate(); }
   get hass(): HomeAssistant | undefined { return this._hass; }
@@ -59,7 +59,13 @@ export class RoomCard extends LitElement {
     this.config = { icon: "mdi:sofa-outline", ...config };
   }
   getCardSize(): number { return 2; }
-  disconnectedCallback(): void { super.disconnectedCallback(); document.removeEventListener("keydown", this._onKey); }
+  disconnectedCallback(): void { super.disconnectedCallback(); }
+  updated(): void {
+    const dlg = this.renderRoot?.querySelector("dialog.sheet") as HTMLDialogElement | null;
+    if (!dlg) return;
+    if (this._editEntity && !dlg.open) dlg.showModal();
+    else if (!this._editEntity && dlg.open) dlg.close();
+  }
 
   private get _lights(): LightSpec[] { return (this.config?.lights ?? []).map((l) => (typeof l === "string" ? { entity: l } : l)); }
   private _attrs(e: string) { return this._hass?.states[e]?.attributes ?? {}; }
@@ -93,7 +99,7 @@ export class RoomCard extends LitElement {
     return "var(--amber)";
   }
 
-  // ---- room interactions ----
+  // ---- room ----
   private _toggleAll(e: Event) { e.stopPropagation(); if (!this._hass) return; const ids = this._presentLights.map((l) => l.entity); if (ids.length) this._hass.callService("light", this._onLights.length ? "turn_off" : "turn_on", { entity_id: ids }); }
   private _toggleOne(entity: string, e: Event) { e.stopPropagation(); this._hass?.callService("light", "toggle", { entity_id: entity }); }
   private _wellDown() { this._dragging = true; }
@@ -102,25 +108,25 @@ export class RoomCard extends LitElement {
   private _onChange(e: Event) { this._commitRoom(Number((e.target as HTMLInputElement).value)); window.setTimeout(() => { this._dragVal = undefined; this._dragging = false; }, 900); }
   private _commitRoom(v: number) { if (!this._hass) return; const ids = this._onDimmable.length ? this._onDimmable : this._presentDimmable; if (ids.length) this._hass.callService("light", "turn_on", { entity_id: ids, brightness_pct: v }); }
 
-  // ---- per-light editor ----
-  private _onKey = (e: KeyboardEvent) => { if (e.key === "Escape") this._closeEdit(); };
+  // ---- light-detail sheet (native <dialog> → top layer, escapes ancestor transforms) ----
   private _openEdit(entity: string, e: Event) {
     e.stopPropagation();
-    if (this._editEntity === entity && !this._closing) { this._closeEdit(); return; }
-    this._editEntity = entity; this._closing = false; this._custom = false; this._editBri = undefined;
-    document.addEventListener("keydown", this._onKey);
+    if (this._editEntity === entity) { this._closeEdit(); return; }
+    this._editEntity = entity; this._custom = false; this._editBri = undefined;
   }
-  private _closeEdit() {
-    if (!this._editEntity) return;
-    this._closing = true;
-    document.removeEventListener("keydown", this._onKey);
-    window.setTimeout(() => { this._editEntity = undefined; this._closing = false; this._custom = false; }, 340);
+  private _closeEdit() { this._editEntity = undefined; this._custom = false; this._editBri = undefined; }
+  private _vbarPos(e: PointerEvent) {
+    const bar = this.renderRoot.querySelector(".vbar") as HTMLElement | null;
+    if (!bar) return;
+    const r = bar.getBoundingClientRect();
+    const pct = clamp(Math.round((1 - (e.clientY - r.top) / r.height) * 100), 1, 100);
+    this._editBri = pct;
+    const now = Date.now();
+    if (now - this._throttle > 200) { this._throttle = now; this._svc({ brightness_pct: pct }); }
   }
-  private _lightBri(e: Event) {
-    const v = Number((e.target as HTMLInputElement).value); this._editBri = v;
-    const now = Date.now(); if (now - this._throttle > 220) { this._throttle = now; this._svc({ brightness_pct: v }); }
-  }
-  private _lightBriChange(e: Event) { this._svc({ brightness_pct: Number((e.target as HTMLInputElement).value) }); window.setTimeout(() => (this._editBri = undefined), 900); }
+  private _vDown(e: PointerEvent) { this._vDrag = true; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); this._vbarPos(e); }
+  private _vMove(e: PointerEvent) { if (this._vDrag) this._vbarPos(e); }
+  private _vUp() { if (!this._vDrag) return; this._vDrag = false; if (this._editBri != null) this._svc({ brightness_pct: this._editBri }); }
   private _lightTemp(e: Event) { this._svc({ color_temp_kelvin: Number((e.target as HTMLInputElement).value) }); }
   private _lightHue(e: Event) { const h = Number((e.target as HTMLInputElement).value); const now = Date.now(); if (now - this._throttle > 180) { this._throttle = now; this._svc({ rgb_color: hueToRgb(h) }); } }
   private _lightHueChange(e: Event) { this._svc({ rgb_color: hueToRgb(Number((e.target as HTMLInputElement).value)) }); }
@@ -133,7 +139,6 @@ export class RoomCard extends LitElement {
     history.replaceState(null, "", hash);
     window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: true } }));
   }
-  private _more(e?: string) { if (e && this._hass?.states[e]) moreInfo(this, e); }
   private _shortName(l: LightSpec): string { if (l.name) return l.name; const fn = this._attrs(l.entity).friendly_name ?? l.entity; return fn.replace(new RegExp(`^${this.config.name}\\s+`, "i"), "").trim() || fn; }
 
   render() {
@@ -174,63 +179,66 @@ export class RoomCard extends LitElement {
         ${present.length ? html`<div class="pills">
           ${present.map((l) => {
             const on = this._isOn(l.entity);
-            const sw = this._isSwitch(l.entity);
-            const tune = this._canTune(l.entity);
-            const active = this._editEntity === l.entity && !this._closing;
+            const active = this._editEntity === l.entity;
             return html`<div class="pill ${classMap({ on })}" role="group">
               <button class="pt" @click=${(e: Event) => this._toggleOne(l.entity, e)}>
-                <span class="dot ${classMap({ sq: sw })}" style=${styleMap(on ? { "--dot-color": this._dotColor(l.entity) } : {})}></span><span class="pn">${this._shortName(l)}</span>
+                <span class="dot ${classMap({ sq: this._isSwitch(l.entity) })}" style=${styleMap(on ? { "--dot-color": this._dotColor(l.entity) } : {})}></span><span class="pn">${this._shortName(l)}</span>
               </button>
-              ${tune ? html`<button class="tune ${classMap({ active })}" @click=${(e: Event) => this._openEdit(l.entity, e)} aria-expanded=${active} aria-label="Tune ${this._shortName(l)}"><ha-icon icon="mdi:tune-variant"></ha-icon></button>` : nothing}
+              ${this._canTune(l.entity) ? html`<button class="tune ${classMap({ active })}" @click=${(e: Event) => this._openEdit(l.entity, e)} aria-label="Tune ${this._shortName(l)}"><ha-icon icon="mdi:tune-variant"></ha-icon></button>` : nothing}
             </div>`;
           })}
         </div>` : nothing}
 
-        <div class="drawer ${classMap({ open: !!this._editEntity && !this._closing })}">
-          <div class="drawerinner">${this._editEntity ? this._renderEditor(this._editEntity) : nothing}</div>
-        </div>
-
         ${this._renderMedia()}
+        ${this._renderSheet()}
       </ha-card>
     `;
   }
 
-  private _renderEditor(entity: string): TemplateResult {
-    const a = this._attrs(entity);
+  private _renderSheet(): TemplateResult {
+    const entity = this._editEntity;
+    return html`<dialog class="sheet" @cancel=${(e: Event) => { e.preventDefault(); this._closeEdit(); }} @click=${(e: Event) => { if (e.target === e.currentTarget) this._closeEdit(); }}>
+      ${entity ? this._renderSheetBody(entity) : nothing}
+    </dialog>`;
+  }
+
+  private _renderSheetBody(entity: string): TemplateResult {
     const name = this._shortName({ entity });
-    const bri = this._editBri ?? this._briPct(entity);
+    const a = this._attrs(entity);
+    const on = this._isOn(entity);
+    const bri = this._editBri ?? (on ? this._briPct(entity) : 0);
+    const fill = this._dotColor(entity);
     const isRgb = this._isRgb(entity);
     const isTemp = this._isTemp(entity);
     const curRgb = Array.isArray(a.rgb_color) ? (a.rgb_color as RGB).join(",") : "";
-    return html`<div class="edit">
-      <div class="edit-head">
-        <span class="edit-dot" style=${styleMap({ "--dot-color": this._dotColor(entity) })}></span>
-        <span class="edit-name">${name}</span>
-        <button class="edit-close" @click=${() => this._closeEdit()} aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button>
+    return html`
+      <div class="sheet-body" @click=${(e: Event) => e.stopPropagation()}>
+        <div class="sheet-head">
+          <span class="sheet-name">${name}</span>
+          <button class="sheet-x" @click=${() => this._closeEdit()} aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button>
+        </div>
+
+        <div class="vbar" style=${styleMap({ "--fill": fill })}
+          @pointerdown=${(e: PointerEvent) => this._vDown(e)} @pointermove=${(e: PointerEvent) => this._vMove(e)} @pointerup=${() => this._vUp()} @pointercancel=${() => this._vUp()}
+          role="slider" aria-label="${name} brightness" aria-valuenow=${bri}>
+          <div class="vfill" style=${styleMap({ height: `${Math.max(bri, 3)}%` })}></div>
+          <div class="vmeta"><ha-icon icon=${on ? "mdi:lightbulb" : "mdi:lightbulb-outline"}></ha-icon><span>${bri}%</span></div>
+        </div>
+
+        ${isRgb
+          ? this._custom
+            ? html`<div class="crow"><button class="link" @click=${() => (this._custom = false)}><ha-icon icon="mdi:chevron-left"></ha-icon>Presets</button>
+                <input class="hue" type="range" min="0" max="359" @input=${(e: Event) => this._lightHue(e)} @change=${(e: Event) => this._lightHueChange(e)} aria-label="Hue" /></div>`
+            : html`<div class="swatches">
+                ${[2700, 4000].map((k) => html`<button class="sw" style=${styleMap({ background: kelvinDotColor(k) })} @click=${() => this._svc({ color_temp_kelvin: k })} aria-label="${k}K white"></button>`)}
+                ${CURATED.map((s) => html`<button class="sw ${classMap({ sel: curRgb === hexToRgb(s.hex).join(",") })}" style=${styleMap({ background: s.hex })} @click=${() => this._svc({ rgb_color: hexToRgb(s.hex) })} aria-label=${s.name}></button>`)}
+                <button class="sw wheel" @click=${() => (this._custom = true)} aria-label="Custom colour"></button>
+              </div>`
+          : isTemp
+            ? html`<input class="ct" type="range" min=${a.min_color_temp_kelvin ?? 2200} max=${a.max_color_temp_kelvin ?? 6500} .value=${String(a.color_temp_kelvin ?? 2700)} @input=${(e: Event) => this._lightTemp(e)} aria-label="Colour temperature" />`
+            : nothing}
       </div>
-      <div class="well mini">
-        <div class="fill" style=${styleMap({ width: `max(${bri}%, 9%)` })}></div>
-        <input class="wellinput" type="range" min="1" max="100" .value=${String(Math.max(1, bri))}
-          @input=${(e: Event) => this._lightBri(e)} @change=${(e: Event) => this._lightBriChange(e)} aria-label="${name} brightness" />
-      </div>
-      ${isRgb
-        ? this._custom
-          ? html`<div class="customrow">
-              <button class="link" @click=${() => (this._custom = false)}><ha-icon icon="mdi:chevron-left"></ha-icon>swatches</button>
-              <input class="hue" type="range" min="0" max="359" @input=${(e: Event) => this._lightHue(e)} @change=${(e: Event) => this._lightHueChange(e)} aria-label="Hue" />
-            </div>`
-          : html`<div class="swatches">
-              ${[2700, 4000].map((k) => html`<button class="swatch" style=${styleMap({ background: kelvinDotColor(k) })} @click=${() => this._svc({ color_temp_kelvin: k })} aria-label="${k}K white"></button>`)}
-              ${CURATED.map((s) => {
-                const sel = curRgb === hexToRgb(s.hex).join(",");
-                return html`<button class="swatch ${classMap({ sel })}" style=${styleMap({ background: s.hex })} @click=${() => this._svc({ rgb_color: hexToRgb(s.hex) })} aria-label=${s.name}></button>`;
-              })}
-              <button class="swatch custom" @click=${() => (this._custom = true)} aria-label="Custom colour"></button>
-            </div>`
-        : isTemp
-          ? html`<input class="ct" type="range" min=${a.min_color_temp_kelvin ?? 2200} max=${a.max_color_temp_kelvin ?? 6500} .value=${String(a.color_temp_kelvin ?? 2700)} @input=${(e: Event) => this._lightTemp(e)} aria-label="Colour temperature" />`
-          : nothing}
-    </div>`;
+    `;
   }
 
   private _renderMedia(): TemplateResult | typeof nothing {
@@ -238,21 +246,19 @@ export class RoomCard extends LitElement {
     const s = this._hass?.states[m]; if (!s || !PLAYING.has(s.state)) return nothing;
     const playing = s.state === "playing";
     const title = s.attributes.media_title || s.attributes.source || s.attributes.friendly_name || "Playing";
-    return html`<button class="media" @click=${() => this._more(m)}><span class="eq ${classMap({ live: playing })}"><i></i><i></i><i></i></span><span class="mt">${title}</span></button>`;
+    return html`<button class="media" @click=${() => { if (this._hass?.states[m]) moreInfo(this, m); }}><span class="eq ${classMap({ live: playing })}"><i></i><i></i><i></i></span><span class="mt">${title}</span></button>`;
   }
 
   static styles = css`
     @property --rc-glow { syntax: "<color>"; inherits: true; initial-value: #f2a93b; }
-    :host { --amber: #f5b301; --edit-bg: color-mix(in srgb, var(--primary-text-color) 5%, transparent); --hair: color-mix(in srgb, var(--primary-text-color) 12%, transparent); display: block; }
+    :host { --amber: #f5b301; --hair: color-mix(in srgb, var(--primary-text-color) 12%, transparent); display: block; }
 
     ha-card { position: relative; overflow: hidden; box-sizing: border-box; height: 100%; border-radius: var(--ha-card-border-radius, 16px); padding: 14px 14px 12px;
-      background: var(--ha-card-background, var(--card-background-color, #16181d)); border: 1px solid var(--divider-color, rgba(0,0,0,.08));
-      animation: mount .28s ease-out both; transition: border-color .6s ease, --rc-glow .8s linear; }
+      background: var(--ha-card-background, var(--card-background-color, #16181d)); border: 1px solid var(--divider-color, rgba(0,0,0,.08)); animation: mount .28s ease-out both; transition: border-color .6s ease, --rc-glow .8s linear; }
     ha-card.lit { border-color: color-mix(in srgb, var(--rc-glow) 22%, var(--divider-color, transparent)); }
+    .ambient { position: absolute; inset: 0; pointer-events: none; z-index: 0; border-radius: inherit; overflow: hidden; background: radial-gradient(140% 120% at 50% 82%, color-mix(in srgb, var(--rc-glow) 22%, transparent), transparent 65%); opacity: var(--ambient, 0); transition: opacity .6s ease; }
     @keyframes mount { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-
-    .ambient { position: absolute; inset: 0; pointer-events: none; z-index: 0; background: radial-gradient(140% 120% at 50% 82%, color-mix(in srgb, var(--rc-glow) 22%, transparent), transparent 65%); opacity: var(--ambient, 0); transition: opacity .6s ease; }
-    .header, .wellwrap, .pills, .drawer, .media { position: relative; z-index: 1; }
+    .header, .wellwrap, .pills, .media { position: relative; z-index: 1; }
     button { -webkit-appearance: none; appearance: none; font-family: inherit; border: none; background: none; padding: 0; margin: 0; cursor: pointer; color: inherit; }
 
     .header { display: grid; grid-template-columns: 36px 1fr auto; column-gap: 10px; align-items: center; }
@@ -273,7 +279,6 @@ export class RoomCard extends LitElement {
     .readout { text-align: right; height: 14px; margin-bottom: 3px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--secondary-text-color); opacity: 0; transition: opacity .12s ease; }
     .readout.show { opacity: 1; }
     .well { position: relative; height: 30px; border-radius: 15px; overflow: hidden; background: color-mix(in srgb, var(--primary-text-color) 7%, transparent); }
-    .well.mini { height: 22px; border-radius: 11px; }
     .fill { position: absolute; inset: 0 auto 0 0; width: max(var(--pct), 9%); border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--rc-glow) 55%, #fff8ec), var(--rc-glow)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35); transition: width .45s cubic-bezier(.22,1,.36,1), background .3s linear; }
     .well.cold .fill { width: 0; }
     .well.dragging .fill { transition: none; }
@@ -297,28 +302,39 @@ export class RoomCard extends LitElement {
     .pt:active, .tune:active { transform: scale(.96); }
     @keyframes settle { from { transform: scale(.6); } to { transform: scale(1); } }
 
-    .drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .32s cubic-bezier(.22,1,.36,1); }
-    .drawer.open { grid-template-rows: 1fr; margin-top: 10px; }
-    .drawerinner { min-height: 0; overflow: hidden; }
-    .edit { background: var(--edit-bg); border: 1px solid var(--hair); border-radius: 12px; padding: 10px 11px; opacity: 0; transform: translateY(-4px); transition: opacity .24s ease .06s, transform .24s ease .06s; }
-    .drawer.open .edit { opacity: 1; transform: none; }
-    .edit-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
-    .edit-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--dot-color, var(--amber)); border: 1px solid color-mix(in srgb, var(--primary-text-color) 25%, transparent); }
-    .edit-name { flex: 1; font-size: 13px; font-weight: 600; }
-    .edit-close { width: 24px; height: 24px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: var(--secondary-text-color); }
-    .edit-close ha-icon { --mdc-icon-size: 16px; }
-    .swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .swatch { width: 24px; height: 24px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--primary-text-color) 18%, transparent); }
-    .swatch.sel { outline: 2px solid color-mix(in srgb, var(--primary-text-color) 40%, transparent); outline-offset: 2px; }
-    .swatch.custom { background: conic-gradient(from 0deg, #e8543f, #f59632, #e8d13f, #4fa863, #2fa8c7, #5b6fd4, #b45bd4, #e8543f); }
-    .customrow { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-    .link { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--secondary-text-color); }
-    .link ha-icon { --mdc-icon-size: 16px; }
-    .ct, .hue { flex: 1; width: 100%; height: 22px; border-radius: 11px; margin-top: 10px; cursor: pointer; -webkit-appearance: none; appearance: none; box-shadow: inset 0 0 0 1px var(--hair); }
-    .customrow .ct, .customrow .hue { margin-top: 0; }
+    /* ---- Apple-style light-detail sheet (native <dialog>, top layer) ---- */
+    dialog.sheet { border: none; padding: 0; margin: auto; background: transparent; max-width: none; max-height: none; overflow: visible; }
+    dialog.sheet::backdrop { background: rgba(10,10,14,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    .sheet-body { width: min(300px, calc(100vw - 40px)); background: var(--ha-card-background, var(--card-background-color, #1b1d23)); border: 1px solid var(--hair);
+      border-radius: 28px; padding: 16px 18px 20px; box-shadow: 0 30px 70px -24px rgba(0,0,0,.6); }
+    dialog.sheet[open] .sheet-body { animation: sheetin .26s cubic-bezier(.22,1,.36,1); }
+    @keyframes sheetin { from { opacity: 0; transform: scale(.94) translateY(8px); } to { opacity: 1; transform: none; } }
+    .sheet-head { display: flex; align-items: center; margin-bottom: 14px; }
+    .sheet-name { flex: 1; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+    .sheet-x { width: 28px; height: 28px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: var(--secondary-text-color); background: color-mix(in srgb, var(--primary-text-color) 8%, transparent); }
+    .sheet-x ha-icon { --mdc-icon-size: 17px; }
+
+    .vbar { position: relative; height: 240px; border-radius: 26px; overflow: hidden; cursor: ns-resize; touch-action: none; user-select: none;
+      background: color-mix(in srgb, var(--primary-text-color) 8%, transparent); }
+    .vfill { position: absolute; inset: auto 0 0 0; border-radius: 26px; background: linear-gradient(0deg, color-mix(in srgb, var(--fill) 78%, #000 6%), color-mix(in srgb, var(--fill) 92%, #fff 30%)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .4); transition: height .12s ease; }
+    .vbar:active .vfill, .sheet .vbar.dragging .vfill { transition: none; }
+    .vmeta { position: absolute; inset: auto 0 16px 0; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #1a1a1a; mix-blend-mode: multiply; pointer-events: none; }
+    .vmeta ha-icon { --mdc-icon-size: 22px; }
+    .vmeta span { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+    .swatches { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; justify-content: center; }
+    .sw { width: 30px; height: 30px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--primary-text-color) 18%, transparent); transition: transform .1s ease; }
+    .sw:active { transform: scale(.9); }
+    .sw.sel { outline: 2px solid color-mix(in srgb, var(--primary-text-color) 45%, transparent); outline-offset: 2px; }
+    .sw.wheel { background: conic-gradient(from 0deg, #e8543f, #f59632, #e8d13f, #4fa863, #2fa8c7, #5b6fd4, #b45bd4, #e8543f); }
+    .crow { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+    .link { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--secondary-text-color); }
+    .link ha-icon { --mdc-icon-size: 17px; }
+    .ct, .hue { flex: 1; width: 100%; height: 26px; border-radius: 13px; margin-top: 16px; cursor: pointer; -webkit-appearance: none; appearance: none; box-shadow: inset 0 0 0 1px var(--hair); }
+    .crow .ct, .crow .hue { margin-top: 0; }
     .ct { background: linear-gradient(90deg, #ff9d3d, #ffd9a0, #fff4e0, #dceaf5); }
     .hue { background: linear-gradient(90deg, #ff4d4d, #ffd24d, #4dff4d, #4dffff, #4d4dff, #ff4dff, #ff4d4d); }
-    .ct::-webkit-slider-thumb, .hue::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 999px; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+    .ct::-webkit-slider-thumb, .hue::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 999px; background: #fff; box-shadow: 0 1px 5px rgb(0 0 0 / .45); }
 
     .media { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 11px; padding: 7px 10px; border-radius: 12px; text-align: left; background: color-mix(in srgb, var(--primary-text-color) 5%, transparent); font-size: 12px; }
     .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
@@ -331,9 +347,8 @@ export class RoomCard extends LitElement {
     button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
     @media (prefers-reduced-motion: reduce) {
-      ha-card, .fill, .ambient, .pill, .dot, .power, .eq.live i, .drawer, .edit { animation: none !important; transition: opacity .12s linear, background .15s linear, color .15s linear !important; }
+      ha-card, .fill, .ambient, .pill, .dot, .power, .eq.live i, .sheet-body, .vfill { animation: none !important; transition: opacity .12s linear !important; }
       ha-card { transition: none; }
-      .drawer { transition: none; }
     }
   `;
 }
@@ -342,6 +357,6 @@ export class RoomCard extends LitElement {
 (window as any).customCards.push({
   type: "homelab-room-card",
   name: "Room Card",
-  description: "Calm room control: warm Lightwell, per-light colour dots, tap-to-tune brightness & colour.",
+  description: "Calm room control: warm Lightwell, colour dots, Apple-style per-light detail sheet.",
   preview: true,
 });
