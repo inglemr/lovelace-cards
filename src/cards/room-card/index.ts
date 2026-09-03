@@ -48,31 +48,24 @@ export class RoomCard extends LitElement {
   private _throttle = 0;
   private _vDrag = false;
   // chip slide-to-dim
+  @state() private _optBri?: { entity: string; pct: number }; // optimistic brightness shown while sliding / until the light confirms
   private _slideEntity?: string;
   private _slideStartX = 0;
   private _slideMoved = false;
   private _sliding = false;
   private _slideThrottle = 0;
-  private _slideLast?: number;
-  private _settleEntity?: string;
-  private _settlePct?: number;
 
   set hass(h: HomeAssistant) {
     this._hass = h;
     this.toggleAttribute("dark", !!(h?.themes as any)?.darkMode);
-    // release the post-slide guard once the light actually reports the target brightness
-    if (this._settleEntity && !this._sliding) {
-      const st = h?.states[this._settleEntity];
-      const cur = this._briPct(this._settleEntity);
-      if (!st || st.state !== "on" || this._settlePct == null || Math.abs(cur - this._settlePct) <= 3) {
-        this._settleEntity = undefined; this._settlePct = undefined;
-      }
+    // drop the optimistic value once the light actually reports the dragged brightness (kills the jump-back)
+    if (this._optBri && !this._sliding) {
+      const st = h?.states[this._optBri.entity];
+      if (!st || st.state !== "on" || Math.abs(this._briPct(this._optBri.entity) - this._optBri.pct) <= 3) this._optBri = undefined;
     }
     this.requestUpdate();
   }
   get hass(): HomeAssistant | undefined { return this._hass; }
-  // don't let re-renders clobber the fill mid-drag (or before the light catches up) — that's the rubber-band
-  protected shouldUpdate(): boolean { return !this._sliding && !this._settleEntity; }
 
   static getStubConfig(): RoomCardConfig { return { type: "custom:homelab-room-card", name: "Room", lights: [] }; }
   setConfig(config: RoomCardConfig): void {
@@ -136,35 +129,30 @@ export class RoomCard extends LitElement {
   // drag a dimmable chip horizontally to set its brightness (tap still toggles)
   private _chipDown(entity: string, e: PointerEvent) {
     if (!this._canTune(entity)) return;
-    this._slideEntity = entity; this._slideStartX = e.clientX; this._slideMoved = false; this._slideLast = undefined;
+    this._slideEntity = entity; this._slideStartX = e.clientX; this._slideMoved = false;
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   }
   private _chipMove(entity: string, e: PointerEvent) {
     if (this._slideEntity !== entity) return;
     if (!this._slideMoved && Math.abs(e.clientX - this._slideStartX) < 6) return;
-    this._slideMoved = true; this._sliding = true; // _sliding blocks re-renders (shouldUpdate)
+    this._slideMoved = true; this._sliding = true;
     const pill = (e.currentTarget as HTMLElement).closest(".pill") as HTMLElement | null;
     if (!pill) return;
     const r = pill.getBoundingClientRect();
     const pct = clamp(Math.round(((e.clientX - r.left) / r.width) * 100), 1, 100);
-    this._slideLast = pct;
-    pill.style.setProperty("--bri", `${pct}%`);   // drive the fill imperatively (no re-render)
-    pill.classList.add("on", "sliding");
+    this._optBri = { entity, pct }; // reactive: the render shows THIS, never the light's lagging value
     const now = Date.now();
-    if (now - this._slideThrottle > 180) { this._slideThrottle = now; this._hass?.callService("light", "turn_on", { entity_id: entity, brightness_pct: pct }); }
+    if (now - this._slideThrottle > 160) { this._slideThrottle = now; this._hass?.callService("light", "turn_on", { entity_id: entity, brightness_pct: pct, transition: 0 }); }
   }
-  private _chipUp(entity: string, e: PointerEvent) {
+  private _chipUp(entity: string) {
     if (this._slideEntity !== entity) return;
-    this._slideEntity = undefined;
-    const pill = (e.currentTarget as HTMLElement).closest(".pill") as HTMLElement | null;
-    pill?.classList.remove("sliding");
-    this._sliding = false;
-    if (this._slideMoved && this._slideLast != null) {
-      const pct = this._slideLast;
-      this._hass?.callService("light", "turn_on", { entity_id: entity, brightness_pct: pct });
-      // hold the fill at the target (blocking re-render) until the light reports it back — kills the jump-back
-      this._settleEntity = entity; this._settlePct = pct;
-      window.setTimeout(() => { if (this._settleEntity === entity) { this._settleEntity = undefined; this._settlePct = undefined; this.requestUpdate(); } }, 1500);
+    this._slideEntity = undefined; this._sliding = false;
+    if (this._slideMoved && this._optBri?.entity === entity) {
+      this._hass?.callService("light", "turn_on", { entity_id: entity, brightness_pct: this._optBri.pct, transition: 0 });
+      // keep showing the optimistic value until the light confirms (or 1.6s safety)
+      window.setTimeout(() => { if (this._optBri?.entity === entity) { this._optBri = undefined; } }, 1600);
+    } else {
+      this._optBri = undefined;
     }
   }
 
@@ -228,18 +216,19 @@ export class RoomCard extends LitElement {
 
         ${this._lights.length ? html`<div class="pills">
           ${this._lights.map((l) => {
-            const on = this._isOn(l.entity);
+            const slid = this._optBri?.entity === l.entity;
+            const on = slid || this._isOn(l.entity);
             const offline = !this._isPresent(l.entity);
             const active = this._editEntity === l.entity;
-            const bri = on ? (this._isSwitch(l.entity) ? 100 : this._briPct(l.entity)) : 100;
-            return html`<div class="pill ${classMap({ on, offline })}" role="group" style=${styleMap({ "--bri": `${bri}%` })}>
+            const bri = slid ? this._optBri!.pct : (on ? (this._isSwitch(l.entity) ? 100 : this._briPct(l.entity)) : 100);
+            return html`<div class="pill ${classMap({ on, offline, sliding: slid })}" role="group" style=${styleMap({ "--bri": `${bri}%` })}>
               <button class="pt" @click=${(e: Event) => this._toggleOne(l.entity, e)}
                 @pointerdown=${(e: PointerEvent) => this._chipDown(l.entity, e)}
                 @pointermove=${(e: PointerEvent) => this._chipMove(l.entity, e)}
-                @pointerup=${(e: PointerEvent) => this._chipUp(l.entity, e)}
-                @pointercancel=${(e: PointerEvent) => this._chipUp(l.entity, e)}>
+                @pointerup=${() => this._chipUp(l.entity)}
+                @pointercancel=${() => this._chipUp(l.entity)}>
                 <span class="dot ${classMap({ sq: this._isSwitch(l.entity) })}" style=${styleMap(on ? { "--dot-color": this._dotColor(l.entity) } : {})}></span><span class="pn">${this._shortName(l)}</span>
-                ${offline ? html`<span class="pb off">offline</span>` : on && this._canTune(l.entity) ? html`<span class="pb">${this._briPct(l.entity)}%</span>` : nothing}
+                ${offline ? html`<span class="pb off">offline</span>` : slid ? html`<span class="pb">${this._optBri!.pct}%</span>` : on && this._canTune(l.entity) ? html`<span class="pb">${this._briPct(l.entity)}%</span>` : nothing}
               </button>
               ${!offline && this._canTune(l.entity) ? html`<button class="tune ${classMap({ active })}" @click=${(e: Event) => this._openEdit(l.entity, e)} aria-label="Tune ${this._shortName(l)}"><ha-icon icon="mdi:tune-variant"></ha-icon></button>` : nothing}
             </div>`;
