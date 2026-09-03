@@ -153,7 +153,7 @@ export class NeedsAttentionCard extends LitElement {
               ${cons.map((i) => this._consRow(i))}
             </div>`
           : this.config.show_ok !== false
-            ? html`<div class="empty">Nothing needs attention right now.</div>`
+            ? html`<div class="empty warm"><ha-icon icon="mdi:check-circle-outline"></ha-icon><div>All caught up</div><small>Nothing needs a human right now.</small></div>`
             : nothing}
       </ha-card>
     `;
@@ -207,6 +207,10 @@ export class NeedsAttentionCard extends LitElement {
     .ok { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #34d399; }
     .ok ha-icon { --mdc-icon-size: 15px; }
     .empty { padding: 6px 2px 12px; font-size: 13px; color: color-mix(in srgb, var(--primary-text-color) 45%, transparent); }
+    .empty.warm { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; padding: 16px 8px 18px; }
+    .empty.warm ha-icon { --mdc-icon-size: 30px; color: #34d399; }
+    .empty.warm div { font-size: 15px; font-weight: 700; color: var(--primary-text-color); }
+    .empty.warm small { font-size: 12px; color: color-mix(in srgb, var(--primary-text-color) 45%, transparent); }
 
     .list { display: flex; flex-direction: column; }
     .row { display: flex; align-items: center; gap: 12px; padding: 9px 2px; border-top: 1px solid color-mix(in srgb, var(--primary-text-color) 7%, transparent); }
