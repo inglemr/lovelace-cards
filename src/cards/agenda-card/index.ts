@@ -13,6 +13,7 @@ interface AgendaConfig extends LovelaceCardConfig {
   calendars?: CalSpec[];
   days?: number; // window (default 2 = today + tomorrow)
   max?: number; // max events shown (default 5)
+  hide_when_empty?: boolean; // render nothing on a clear day
 }
 
 const NAMED: Record<string, string> = {
@@ -125,6 +126,8 @@ export class AgendaCard extends LitElement {
 
   render() {
     if (!this.config || !this._hass) return nothing;
+    // hide the whole card on an empty day (once loaded) when configured to
+    if (this.config.hide_when_empty && this.events && !this.events.length) return nothing;
     return html`
       <ha-card>
         <div class="head">

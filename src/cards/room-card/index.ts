@@ -36,14 +36,11 @@ interface RoomCardConfig extends LovelaceCardConfig {
   navigation_path?: string;
 }
 
-const PLAYING = new Set(["playing", "on", "paused"]);
 const POWER_PATH = "M13 3h-2v10h2V3zm4.83 2.17-1.42 1.42A6.92 6.92 0 0 1 19 12a7 7 0 1 1-11.83-5.06L5.76 5.51a9 9 0 1 0 12.07.66z";
 
 @customElement("homelab-room-card")
 export class RoomCard extends LitElement {
   @state() private config!: RoomCardConfig;
-  @state() private _dragVal?: number;
-  @state() private _dragging = false;
   @state() private _editEntity?: string;
   @state() private _editBri?: number;
   @state() private _custom = false;
@@ -80,10 +77,7 @@ export class RoomCard extends LitElement {
   private _briFrac(e: string): number { if (this._isSwitch(e)) return 1; return (this._attrs(e).brightness ?? 255) / 255; }
   private get _presentLights(): LightSpec[] { return this._lights.filter((l) => this._isPresent(l.entity)); }
   private get _onLights(): LightSpec[] { return this._lights.filter((l) => this._isOn(l.entity)); }
-  private get _presentDimmable(): string[] { return this._presentLights.filter((l) => !this._isSwitch(l.entity)).map((l) => l.entity); }
-  private get _onDimmable(): string[] { return this._onLights.filter((l) => !this._isSwitch(l.entity)).map((l) => l.entity); }
   private _briPct(e: string): number { return Math.round(((this._attrs(e).brightness ?? 0) / 255) * 100); }
-  private _roomBriPct(): number { const ds = this._onDimmable; if (!ds.length) return 0; return Math.round((ds.reduce((s, e) => s + (this._attrs(e).brightness ?? 0), 0) / ds.length / 255) * 100); }
   private _meanBriFrac(): number { const on = this._onLights; if (!on.length) return 0; return on.reduce((s, l) => s + this._briFrac(l.entity), 0) / on.length; }
 
   private _glowColor(): string {
@@ -101,13 +95,16 @@ export class RoomCard extends LitElement {
   }
 
   // ---- room ----
-  private _toggleAll(e: Event) { e.stopPropagation(); if (!this._hass) return; const ids = this._presentLights.map((l) => l.entity); if (ids.length) this._hass.callService("light", this._onLights.length ? "turn_off" : "turn_on", { entity_id: ids }); }
-  private _toggleOne(entity: string, e: Event) { e.stopPropagation(); this._hass?.callService("light", "toggle", { entity_id: entity }); }
-  private _wellDown() { this._dragging = true; }
-  private _wellUp() { this._dragging = false; }
-  private _onInput(e: Event) { const v = Number((e.target as HTMLInputElement).value); this._dragVal = v; const now = Date.now(); if (now - this._throttle > 220) { this._throttle = now; this._commitRoom(v); } }
-  private _onChange(e: Event) { this._commitRoom(Number((e.target as HTMLInputElement).value)); window.setTimeout(() => { this._dragVal = undefined; this._dragging = false; }, 900); }
-  private _commitRoom(v: number) { if (!this._hass) return; const ids = this._onDimmable.length ? this._onDimmable : this._presentDimmable; if (ids.length) this._hass.callService("light", "turn_on", { entity_id: ids, brightness_pct: v }); }
+  // tactile spring 'pop' — restarts the animation, plays only on real user taps
+  private _pop(el: Element | null) {
+    if (!el) return;
+    el.classList.remove("pop");
+    void (el as HTMLElement).offsetWidth; // reflow to restart
+    el.classList.add("pop");
+    window.setTimeout(() => el.classList.remove("pop"), 460);
+  }
+  private _toggleAll(e: Event) { e.stopPropagation(); if (!this._hass) return; this._pop(e.currentTarget as HTMLElement); const ids = this._presentLights.map((l) => l.entity); if (ids.length) this._hass.callService("light", this._onLights.length ? "turn_off" : "turn_on", { entity_id: ids }); }
+  private _toggleOne(entity: string, e: Event) { e.stopPropagation(); this._pop((e.currentTarget as HTMLElement).closest(".pill")); this._hass?.callService("light", "toggle", { entity_id: entity }); }
 
   // ---- light-detail sheet (native <dialog> → top layer, escapes ancestor transforms) ----
   private _openEdit(entity: string, e: Event) {
@@ -150,12 +147,10 @@ export class RoomCard extends LitElement {
     const onCount = this._onLights.length;
     const total = present.length;
     const anyOn = onCount > 0;
-    const hasDimmable = this._presentDimmable.length > 0;
-    const pct = this._dragVal ?? this._roomBriPct();
     const ambient = anyOn ? Math.max(0.15, (dark ? 0.9 : 0.45) * (onCount / Math.max(1, total)) * this._meanBriFrac()) : 0;
 
     return html`
-      <ha-card class=${classMap({ lit: anyOn })} style=${styleMap({ "--rc-glow": this._glowColor(), "--pct": `${pct}%`, "--pctnum": String(pct / 100), "--ambient": String(ambient) })}>
+      <ha-card class=${classMap({ lit: anyOn })} style=${styleMap({ "--rc-glow": this._glowColor(), "--ambient": String(ambient) })}>
         <div class="ambient" aria-hidden="true"></div>
 
         <div class="header">
@@ -166,16 +161,6 @@ export class RoomCard extends LitElement {
           </button>
           ${total ? html`<button class="power ${classMap({ on: anyOn })}" @click=${(e: Event) => this._toggleAll(e)} aria-label="Toggle ${c.name} lights"><svg viewBox="0 0 24 24" width="16" height="16"><path d=${POWER_PATH} fill="currentColor"></path></svg></button>` : nothing}
         </div>
-
-        ${hasDimmable ? html`<div class="wellwrap">
-          <div class="readout ${classMap({ show: this._dragVal !== undefined })}">${pct}%</div>
-          <div class="well ${classMap({ dragging: this._dragging, cold: !anyOn })}">
-            <div class="fill"><span class="handle"></span><span class="lvl">${pct}%</span></div>
-            <input class="wellinput" type="range" min="1" max="100" .value=${String(Math.max(1, pct))}
-              @pointerdown=${() => this._wellDown()} @pointerup=${() => this._wellUp()} @pointercancel=${() => this._wellUp()}
-              @input=${(e: Event) => this._onInput(e)} @change=${(e: Event) => this._onChange(e)} @click=${(e: Event) => e.stopPropagation()} aria-label="${c.name} brightness" />
-          </div>
-        </div>` : nothing}
 
         ${this._lights.length ? html`<div class="pills">
           ${this._lights.map((l) => {
@@ -244,13 +229,30 @@ export class RoomCard extends LitElement {
     `;
   }
 
+  // rooms without a `media` entity simply render nothing here
   private _renderMedia(): TemplateResult | typeof nothing {
     const m = this.config.media; if (!m) return nothing;
-    const s = this._hass?.states[m]; if (!s || !PLAYING.has(s.state)) return nothing;
+    const s = this._hass?.states[m];
+    if (!s || s.state === "off" || s.state === "unavailable" || s.state === "standby") return nothing;
     const playing = s.state === "playing";
-    const title = s.attributes.media_title || s.attributes.source || s.attributes.friendly_name || "Playing";
-    return html`<button class="media" @click=${() => { if (this._hass?.states[m]) moreInfo(this, m); }}><span class="eq ${classMap({ live: playing })}"><i></i><i></i><i></i></span><span class="mt">${title}</span></button>`;
+    const a = s.attributes;
+    const art = a.entity_picture as string | undefined;
+    const title = a.media_title || (s.state === "idle" ? "Idle" : a.app_name || a.source || "On");
+    const sub = a.media_artist || a.media_series_title || (a.media_title ? a.app_name || a.source || "" : "");
+    const feat = Number(a.supported_features ?? 0);
+    return html`<div class="media">
+      <button class="mart ${classMap({ ph: !art })}" @click=${() => moreInfo(this, m)} style=${styleMap(art ? { backgroundImage: `url("${art}")` } : {})}>
+        ${art ? nothing : html`<span class="eq ${classMap({ live: playing })}"><i></i><i></i><i></i></span>`}
+      </button>
+      <button class="mmeta" @click=${() => moreInfo(this, m)}>
+        <span class="mt">${title}</span>${sub ? html`<span class="msub">${sub}</span>` : nothing}
+      </button>
+      ${feat & 16 ? html`<button class="mctl" @click=${() => this._mediaSvc(m, "media_previous_track")} aria-label="Previous"><ha-icon icon="mdi:skip-previous"></ha-icon></button>` : nothing}
+      ${feat & 16385 ? html`<button class="mctl play" @click=${() => this._mediaSvc(m, "media_play_pause")} aria-label="Play or pause"><ha-icon icon=${playing ? "mdi:pause" : "mdi:play"}></ha-icon></button>` : nothing}
+      ${feat & 32 ? html`<button class="mctl" @click=${() => this._mediaSvc(m, "media_next_track")} aria-label="Next"><ha-icon icon="mdi:skip-next"></ha-icon></button>` : nothing}
+    </div>`;
   }
+  private _mediaSvc(entity: string, service: string) { this._hass?.callService("media_player", service, { entity_id: entity }); }
 
   static styles = [hearth, css`
     @property --rc-glow { syntax: "<color>"; inherits: true; initial-value: #f2a93b; }
@@ -293,6 +295,9 @@ export class RoomCard extends LitElement {
     .power.on { color: var(--hl-ink-on-amber); background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep));
       box-shadow: inset 0 1px 0 rgb(255 255 255 / .4), 0 0 0 4px color-mix(in srgb, var(--hl-amber) 14%, transparent), 0 4px 12px rgb(245 179 1 / .35); }
     .power:active { transform: scale(.94); }
+    /* tactile toggle 'pop' — spring bounce on tap (added via JS, plays once) */
+    @keyframes rc-pop { 0% { transform: scale(1); } 22% { transform: scale(.92); } 55% { transform: scale(1.045); } 100% { transform: scale(1); } }
+    .pill.pop, .power.pop { animation: rc-pop .42s var(--hl-settle); }
 
     .wellwrap { margin-top: 12px; }
     .readout { text-align: right; height: 14px; margin-bottom: 3px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--secondary-text-color); opacity: 0; transition: opacity .12s ease; }
@@ -382,13 +387,27 @@ export class RoomCard extends LitElement {
     .hue { background: linear-gradient(90deg, #ff4d4d, #ffd24d, #4dff4d, #4dffff, #4d4dff, #ff4dff, #ff4d4d); }
     .ct::-webkit-slider-thumb, .hue::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 999px; background: #fff; box-shadow: 0 1px 5px rgb(0 0 0 / .45); }
 
-    .media { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 11px; padding: 7px 10px; border-radius: 12px; text-align: left; background: color-mix(in srgb, var(--primary-text-color) 5%, transparent); font-size: 12px; }
-    .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
-    .eq i { width: 2px; height: 70%; background: var(--secondary-text-color); border-radius: 1px; }
-    .eq.live i { animation: eq 1.6s ease-in-out infinite alternate; }
-    .eq.live i:nth-child(2) { animation-delay: .35s; } .eq.live i:nth-child(3) { animation-delay: .7s; }
-    @keyframes eq { from { height: 30%; } to { height: 100%; } }
-    .mt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: color-mix(in srgb, var(--primary-text-color) 72%, transparent); }
+    .media { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 11px; padding: 8px; border-radius: 14px;
+      background: color-mix(in oklab, rgb(var(--hl-ember)) 5%, var(--card-background-color, #fff)); box-shadow: inset 0 1.5px 3px rgb(var(--hl-ember) / .06), inset 0 -1px 0 rgb(255 255 255 / .5); }
+    :host([dark]) .media { background: color-mix(in oklab, black 20%, var(--card-background-color, #16181d)); box-shadow: inset 0 1.5px 3px rgb(0 0 0 / .3); }
+    .mart { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 10px; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;
+      background-color: color-mix(in oklab, rgb(var(--hl-ember)) 8%, var(--card-background-color, #fff)); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); transition: transform var(--hl-d1) var(--hl-shift); }
+    .mart:active { transform: scale(.94); }
+    .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+    .eq i { width: 2.5px; height: 60%; background: color-mix(in srgb, var(--hl-amber) 70%, var(--primary-text-color)); border-radius: 1px; }
+    .eq.live i { animation: eq 1.5s ease-in-out infinite alternate; }
+    .eq.live i:nth-child(2) { animation-delay: .3s; } .eq.live i:nth-child(3) { animation-delay: .6s; }
+    @keyframes eq { from { height: 25%; } to { height: 100%; } }
+    .mmeta { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; background: none; border: none; padding: 0; cursor: pointer; color: inherit; line-height: 1.25; }
+    .mt { font-size: 13px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .msub { font-size: 11px; color: color-mix(in srgb, var(--primary-text-color) 50%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .mctl { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; border: none; cursor: pointer; color: var(--primary-text-color);
+      background: color-mix(in oklab, rgb(var(--hl-ember)) 6%, var(--card-background-color, #fff)); transition: transform var(--hl-d1) var(--hl-shift); }
+    :host([dark]) .mctl { background: color-mix(in oklab, black 26%, var(--card-background-color, #16181d)); }
+    .mctl ha-icon { --mdc-icon-size: 19px; }
+    .mctl:active { transform: scale(.9); }
+    .mctl.play { color: var(--hl-ink-on-amber); background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 3px 10px rgb(245 179 1 / .35); }
+    .mctl.play ha-icon { --mdc-icon-size: 21px; }
 
     button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
