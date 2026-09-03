@@ -1,4 +1,5 @@
 import { LitElement, html, nothing, css, type TemplateResult } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { LovelaceCardConfig } from "custom-card-helpers";
@@ -185,12 +186,12 @@ export class PetActivityCard extends LitElement {
     if (cam && this._hass?.states[cam.entity]) moreInfo(this, cam.entity);
   }
 
-  static styles = css`
+  static styles = [hearth, css`
     ha-card {
-      border-radius: 24px; padding: 14px 14px 8px;
+      border-radius: var(--hl-r-card); padding: 14px 14px 8px;
       border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
       background: var(--ha-card-background, var(--card-background-color, #111318));
-      box-shadow: 0 16px 34px -22px rgba(0,0,0,.6);
+      box-shadow: var(--hl-e1);
     }
     .head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
     .head ha-icon { --mdc-icon-size: 18px; color: color-mix(in srgb, var(--primary-text-color) 55%, transparent); }
@@ -207,7 +208,7 @@ export class PetActivityCard extends LitElement {
     .where { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; color: color-mix(in srgb, var(--primary-text-color) 62%, transparent); }
     .where ha-icon { --mdc-icon-size: 14px; }
     .when { font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--primary-text-color) 45%, transparent); font-variant-numeric: tabular-nums; }
-  `;
+  `];
 }
 
 (window as any).customCards = (window as any).customCards || [];

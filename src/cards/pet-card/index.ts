@@ -1,4 +1,5 @@
 import { LitElement, html, svg, nothing, css, type TemplateResult } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
@@ -221,15 +222,15 @@ export class PetCard extends LitElement {
     return this._chip(x.icon ?? "mdi:information-outline", `${x.name ? x.name + ": " : ""}${v}`, () => this._more(x.entity));
   }
 
-  static styles = css`
+  static styles = [hearth, css`
     :host { --pet-accent: #fb8c00; }
     ha-card {
-      position: relative; overflow: hidden; border-radius: 24px; padding: 14px 16px 13px;
+      position: relative; overflow: hidden; border-radius: var(--hl-r-card); padding: 14px 16px 13px;
       border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
       background:
         radial-gradient(120% 80% at 100% -20%, color-mix(in srgb, var(--pet-accent) 14%, transparent), transparent 55%),
         var(--ha-card-background, var(--card-background-color, #111318));
-      box-shadow: 0 16px 34px -22px rgba(0,0,0,.6);
+      box-shadow: var(--hl-e1);
     }
     .top { display: flex; align-items: center; gap: 12px; }
     .avatar { width: 52px; height: 52px; border-radius: 999px; overflow: hidden; flex: 0 0 auto; box-shadow: 0 0 0 2px color-mix(in srgb, var(--pet-accent) 60%, transparent), 0 6px 14px -6px rgba(0,0,0,.5); }
@@ -257,7 +258,7 @@ export class PetCard extends LitElement {
     .chips { display: flex; flex-wrap: wrap; gap: 7px; }
     .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 4px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent); color: color-mix(in srgb, var(--primary-text-color) 72%, transparent); background: color-mix(in srgb, var(--primary-text-color) 4%, transparent); cursor: pointer; }
     .chip ha-icon { --mdc-icon-size: 15px; color: var(--pet-accent); }
-  `;
+  `];
 }
 
 (window as any).customCards = (window as any).customCards || [];

@@ -1,4 +1,5 @@
 import { LitElement, html, svg, nothing, type TemplateResult } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
@@ -55,7 +56,7 @@ const RANGES: { key: number; label: string }[] = [
 
 @customElement("phev-vehicle-card")
 export class PhevVehicleCard extends LitElement {
-  static styles = styles;
+  static styles = [hearth, styles];
 
   @state() private config!: PhevVehicleCardConfig;
   @state() private tab: TabId = "overview";

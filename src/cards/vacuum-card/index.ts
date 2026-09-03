@@ -1,4 +1,5 @@
 import { LitElement, html, nothing, css, type TemplateResult } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import type { LovelaceCardConfig } from "custom-card-helpers";
@@ -193,13 +194,13 @@ export class VacuumCard extends LitElement {
     if (this._hass?.states[e]) moreInfo(this, e);
   }
 
-  static styles = css`
+  static styles = [hearth, css`
     :host { --vc-blue: #38bdf8; --vc-green: #34d399; }
     ha-card {
-      border-radius: 22px; padding: 12px 14px;
+      border-radius: var(--hl-r-card); padding: 12px 14px;
       border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
       background: var(--ha-card-background, var(--card-background-color, #111318));
-      box-shadow: 0 16px 34px -22px rgba(0,0,0,.6);
+      box-shadow: var(--hl-e1);
     }
     ha-card.active { border-color: color-mix(in srgb, var(--vc-blue) 40%, transparent); background: color-mix(in srgb, var(--vc-blue) 8%, transparent); }
     .top { display: flex; align-items: center; gap: 12px; cursor: pointer; }
@@ -227,7 +228,7 @@ export class VacuumCard extends LitElement {
     .ctl.primary ha-icon { color: #0b1220; }
     .ctl:hover { filter: brightness(1.06); }
     .ctl:active { transform: translateY(1px) scale(.985); }
-  `;
+  `];
 }
 
 (window as any).customCards = (window as any).customCards || [];

@@ -1,4 +1,5 @@
 import { LitElement, html, nothing, css, type TemplateResult } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
@@ -249,12 +250,12 @@ export class RoomCard extends LitElement {
     return html`<button class="media" @click=${() => { if (this._hass?.states[m]) moreInfo(this, m); }}><span class="eq ${classMap({ live: playing })}"><i></i><i></i><i></i></span><span class="mt">${title}</span></button>`;
   }
 
-  static styles = css`
+  static styles = [hearth, css`
     @property --rc-glow { syntax: "<color>"; inherits: true; initial-value: #f2a93b; }
     :host { --amber: #f5b301; --hair: color-mix(in srgb, var(--primary-text-color) 12%, transparent); display: block; }
 
-    ha-card { position: relative; overflow: hidden; box-sizing: border-box; height: 100%; border-radius: var(--ha-card-border-radius, 16px); padding: 14px 14px 12px;
-      background: var(--ha-card-background, var(--card-background-color, #16181d)); border: 1px solid var(--divider-color, rgba(0,0,0,.08)); animation: mount .28s ease-out both; transition: border-color .6s ease, --rc-glow .8s linear; }
+    ha-card { position: relative; overflow: hidden; box-sizing: border-box; height: 100%; border-radius: var(--hl-r-card); box-shadow: var(--hl-e1); padding: 14px 14px 12px;
+      background: var(--ha-card-background, var(--card-background-color, #16181d)); border: 1px solid var(--divider-color, rgba(0,0,0,.08)); animation: hl-rise var(--hl-d3) var(--hl-settle) both; transition: border-color .6s ease, --rc-glow .8s linear; }
     ha-card.lit { border-color: color-mix(in srgb, var(--rc-glow) 22%, var(--divider-color, transparent)); }
     .ambient { position: absolute; inset: 0; pointer-events: none; z-index: 0; border-radius: inherit; overflow: hidden; background: radial-gradient(140% 120% at 50% 82%, color-mix(in srgb, var(--rc-glow) 22%, transparent), transparent 65%); opacity: var(--ambient, 0); transition: opacity .6s ease; }
     @keyframes mount { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -279,7 +280,7 @@ export class RoomCard extends LitElement {
     .readout { text-align: right; height: 14px; margin-bottom: 3px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--secondary-text-color); opacity: 0; transition: opacity .12s ease; }
     .readout.show { opacity: 1; }
     .well { position: relative; height: 30px; border-radius: 15px; overflow: hidden; background: color-mix(in srgb, var(--primary-text-color) 7%, transparent); }
-    .fill { position: absolute; inset: 0 auto 0 0; width: max(var(--pct), 9%); border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--rc-glow) 55%, #fff8ec), var(--rc-glow)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35); transition: width .45s cubic-bezier(.22,1,.36,1), background .3s linear; }
+    .fill { position: absolute; inset: 0 auto 0 0; width: max(var(--pct), 9%); border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--rc-glow) 55%, #fff8ec), var(--rc-glow)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35); transition: width .45s var(--hl-settle), background .3s linear; }
     .well.cold .fill { width: 0; }
     .well.dragging .fill { transition: none; }
     .wellinput { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; -webkit-appearance: none; appearance: none; background: transparent; }
@@ -307,7 +308,7 @@ export class RoomCard extends LitElement {
     dialog.sheet::backdrop { background: rgba(10,10,14,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
     .sheet-body { width: min(300px, calc(100vw - 40px)); background: var(--ha-card-background, var(--card-background-color, #1b1d23)); border: 1px solid var(--hair);
       border-radius: 28px; padding: 16px 18px 20px; box-shadow: 0 30px 70px -24px rgba(0,0,0,.6); }
-    dialog.sheet[open] .sheet-body { animation: sheetin .26s cubic-bezier(.22,1,.36,1); }
+    dialog.sheet[open] .sheet-body { animation: sheetin .26s var(--hl-settle); }
     @keyframes sheetin { from { opacity: 0; transform: scale(.94) translateY(8px); } to { opacity: 1; transform: none; } }
     .sheet-head { display: flex; align-items: center; margin-bottom: 14px; }
     .sheet-name { flex: 1; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
@@ -350,7 +351,7 @@ export class RoomCard extends LitElement {
       ha-card, .fill, .ambient, .pill, .dot, .power, .eq.live i, .sheet-body, .vfill { animation: none !important; transition: opacity .12s linear !important; }
       ha-card { transition: none; }
     }
-  `;
+  `];
 }
 
 (window as any).customCards = (window as any).customCards || [];

@@ -1,4 +1,5 @@
 import { LitElement, html, nothing, css } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import type { LovelaceCardConfig } from "custom-card-helpers";
@@ -189,13 +190,13 @@ export class FeederCard extends LitElement {
     if (e && this._hass?.states[e]) moreInfo(this, e);
   }
 
-  static styles = css`
+  static styles = [hearth, css`
     :host { --fd-amber: #fbbf24; --fd-green: #34d399; --fd-red: #f87171; }
     ha-card {
-      border-radius: 24px; padding: 14px;
+      border-radius: var(--hl-r-card); padding: 14px;
       border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
       background: var(--ha-card-background, var(--card-background-color, #111318));
-      box-shadow: 0 16px 34px -22px rgba(0,0,0,.6);
+      box-shadow: var(--hl-e1);
     }
     .head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
     .head > ha-icon { --mdc-icon-size: 20px; color: color-mix(in srgb, var(--primary-text-color) 55%, transparent); }
@@ -240,7 +241,7 @@ export class FeederCard extends LitElement {
     .act.primary ha-icon { color: #1a1205; }
     .act:hover { filter: brightness(1.05); }
     .act:active { transform: translateY(1px) scale(.985); }
-  `;
+  `];
 }
 
 (window as any).customCards = (window as any).customCards || [];

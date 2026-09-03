@@ -1,4 +1,5 @@
 import { LitElement, html, nothing, css, type TemplateResult } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 import { classMap } from "lit/directives/class-map.js";
@@ -209,7 +210,7 @@ export class BatteryFleetCard extends LitElement {
     if (this._hass?.states[e]) moreInfo(this, e);
   }
 
-  static styles = css`
+  static styles = [hearth, css`
     :host {
       --bf-red: #f87171;
       --bf-amber: #fbbf24;
@@ -217,10 +218,10 @@ export class BatteryFleetCard extends LitElement {
       --bf-grey: #6b7280;
     }
     ha-card {
-      border-radius: 24px; padding: 14px 14px 10px;
+      border-radius: var(--hl-r-card); padding: 14px 14px 10px;
       border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
       background: var(--ha-card-background, var(--card-background-color, #111318));
-      box-shadow: 0 16px 34px -22px rgba(0,0,0,.6);
+      box-shadow: var(--hl-e1);
     }
     .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .head > ha-icon { --mdc-icon-size: 19px; color: color-mix(in srgb, var(--primary-text-color) 55%, transparent); }
@@ -240,12 +241,12 @@ export class BatteryFleetCard extends LitElement {
     .mid { flex: 1; min-width: 0; }
     .name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
     .track { height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--primary-text-color) 10%, transparent); overflow: hidden; }
-    .fill { height: 100%; border-radius: 999px; transition: width 0.8s cubic-bezier(0.22,1,0.36,1); }
+    .fill { height: 100%; border-radius: 999px; transition: width 0.8s var(--hl-settle); }
     .right { text-align: right; flex: 0 0 auto; min-width: 52px; }
     .pct { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .pct.off { font-size: 12px; font-weight: 600; color: var(--bf-grey); }
     .days { font-size: 10.5px; font-weight: 600; color: color-mix(in srgb, var(--primary-text-color) 42%, transparent); }
-  `;
+  `];
 }
 
 (window as any).customCards = (window as any).customCards || [];

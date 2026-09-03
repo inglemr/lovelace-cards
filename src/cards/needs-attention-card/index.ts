@@ -1,4 +1,5 @@
 import { LitElement, html, nothing, css, type TemplateResult } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import type { LovelaceCardConfig } from "custom-card-helpers";
 import type { HomeAssistant } from "../../shared/ha";
@@ -186,17 +187,17 @@ export class NeedsAttentionCard extends LitElement {
     if (this._hass?.states[e]) moreInfo(this, e);
   }
 
-  static styles = css`
+  static styles = [hearth, css`
     :host {
       --na-red: #f87171;
       --na-amber: #fbbf24;
       --na-blue: #38bdf8;
     }
     ha-card {
-      border-radius: 24px; padding: 14px 14px 10px;
+      border-radius: var(--hl-r-card); padding: 14px 14px 10px;
       border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
       background: var(--ha-card-background, var(--card-background-color, #111318));
-      box-shadow: 0 16px 34px -22px rgba(0,0,0,.6);
+      box-shadow: var(--hl-e1);
     }
     .head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
     .head > ha-icon { --mdc-icon-size: 19px; color: color-mix(in srgb, var(--primary-text-color) 55%, transparent); }
@@ -219,7 +220,7 @@ export class NeedsAttentionCard extends LitElement {
     .label { font-size: 13.5px; font-weight: 600; }
     .sub { font-size: 11px; color: color-mix(in srgb, var(--primary-text-color) 45%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
     .val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
-  `;
+  `];
 }
 
 (window as any).customCards = (window as any).customCards || [];

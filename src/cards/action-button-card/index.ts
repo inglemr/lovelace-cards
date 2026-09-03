@@ -1,4 +1,5 @@
 import { LitElement, html, nothing, css } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import { handleAction, type LovelaceCardConfig, type ActionConfig } from "custom-card-helpers";
 import type { HomeAssistant } from "../../shared/ha";
@@ -83,13 +84,13 @@ export class ActionButtonCard extends LitElement {
     `;
   }
 
-  static styles = css`
+  static styles = [hearth, css`
     :host { display: block; height: 100%; }
     .btn {
       -webkit-appearance: none; appearance: none;
       width: 100%; height: 100%; min-height: 56px;
       display: flex; align-items: center; justify-content: center; gap: 10px;
-      padding: 12px 14px; border-radius: 18px; cursor: pointer;
+      padding: 12px 14px; border-radius: var(--hl-r-inner); cursor: pointer;
       font-family: inherit; font-weight: 700; font-size: 15px; line-height: 1.1;
       transition: transform 0.07s ease, filter 0.12s ease, box-shadow 0.12s ease;
     }
@@ -114,7 +115,7 @@ export class ActionButtonCard extends LitElement {
     .btn:hover { filter: brightness(1.05); }
     .btn:active { transform: translateY(1px) scale(0.985); filter: brightness(0.95); }
     .btn:focus-visible { outline: 2px solid var(--abc); outline-offset: 2px; }
-  `;
+  `];
 }
 
 (window as any).customCards = (window as any).customCards || [];

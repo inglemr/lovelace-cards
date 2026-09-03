@@ -2,7 +2,7 @@ import { css } from "lit";
 
 export const styles = css`
   :host {
-    --pv-radius: 24px;
+    --pv-radius: var(--hl-r-card);
     --pv-elec: #34d399;
     --pv-elec-2: #10b981;
     --pv-fuel: #fbbf24;
@@ -26,7 +26,7 @@ export const styles = css`
       radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--pv-accent) 10%, transparent), transparent 60%),
       linear-gradient(180deg, color-mix(in srgb, var(--primary-text-color) 4%, transparent), transparent 40%),
       var(--ha-card-background, var(--card-background-color, #111318));
-    box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.65);
+    box-shadow: var(--hl-e1);
   }
 
   /* header */
@@ -67,7 +67,7 @@ export const styles = css`
   .gauge .val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .gauge .val small { font-size: 11px; font-weight: 600; color: var(--pv-muted); margin-left: 2px; }
   .track { position: relative; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--primary-text-color) 10%, transparent); overflow: hidden; }
-  .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+  .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; transition: width 0.9s var(--hl-settle); }
   .fill.elec { background: linear-gradient(90deg, var(--pv-elec-2), var(--pv-elec)); box-shadow: 0 0 14px -2px color-mix(in srgb, var(--pv-elec) 70%, transparent); }
   .fill.fuel { background: linear-gradient(90deg, var(--pv-fuel-2), var(--pv-fuel)); box-shadow: 0 0 14px -2px color-mix(in srgb, var(--pv-fuel) 70%, transparent); }
 

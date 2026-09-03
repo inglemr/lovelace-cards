@@ -1,4 +1,5 @@
 import { LitElement, html, nothing, css, type TemplateResult } from "lit";
+import { hearth } from "../../shared/hearth";
 import { customElement, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import type { LovelaceCardConfig } from "custom-card-helpers";
@@ -238,13 +239,13 @@ export class LaundryTrackerCard extends LitElement {
     if (this._hass?.states[e]) moreInfo(this, e);
   }
 
-  static styles = css`
+  static styles = [hearth, css`
     :host { --lt-blue: #38bdf8; }
     ha-card {
-      border-radius: 24px; padding: 14px 14px 12px;
+      border-radius: var(--hl-r-card); padding: 14px 14px 12px;
       border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
       background: var(--ha-card-background, var(--card-background-color, #111318));
-      box-shadow: 0 16px 34px -22px rgba(0,0,0,.6);
+      box-shadow: var(--hl-e1);
     }
     .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .head > ha-icon { --mdc-icon-size: 19px; color: color-mix(in srgb, var(--primary-text-color) 55%, transparent); }
@@ -275,7 +276,7 @@ export class LaundryTrackerCard extends LitElement {
     .cell { flex: 1; height: 12px; border-radius: 4px; background: color-mix(in srgb, var(--primary-text-color) 9%, transparent); }
     .cell.on { background: var(--lt-blue); box-shadow: 0 0 10px -3px color-mix(in srgb, var(--lt-blue) 80%, transparent); }
     .cell.today { outline: 1.5px solid color-mix(in srgb, var(--primary-text-color) 22%, transparent); outline-offset: 1px; }
-  `;
+  `];
 }
 
 (window as any).customCards = (window as any).customCards || [];
