@@ -177,16 +177,17 @@ export class RoomCard extends LitElement {
           </div>
         </div>` : nothing}
 
-        ${present.length ? html`<div class="pills">
-          ${present.map((l) => {
+        ${this._lights.length ? html`<div class="pills">
+          ${this._lights.map((l) => {
             const on = this._isOn(l.entity);
+            const offline = !this._isPresent(l.entity);
             const active = this._editEntity === l.entity;
-            return html`<div class="pill ${classMap({ on })}" role="group">
+            return html`<div class="pill ${classMap({ on, offline })}" role="group">
               <button class="pt" @click=${(e: Event) => this._toggleOne(l.entity, e)}>
                 <span class="dot ${classMap({ sq: this._isSwitch(l.entity) })}" style=${styleMap(on ? { "--dot-color": this._dotColor(l.entity) } : {})}></span><span class="pn">${this._shortName(l)}</span>
-                ${on && this._canTune(l.entity) ? html`<span class="pb">${this._briPct(l.entity)}%</span>` : nothing}
+                ${offline ? html`<span class="pb off">offline</span>` : on && this._canTune(l.entity) ? html`<span class="pb">${this._briPct(l.entity)}%</span>` : nothing}
               </button>
-              ${this._canTune(l.entity) ? html`<button class="tune ${classMap({ active })}" @click=${(e: Event) => this._openEdit(l.entity, e)} aria-label="Tune ${this._shortName(l)}"><ha-icon icon="mdi:tune-variant"></ha-icon></button>` : nothing}
+              ${!offline && this._canTune(l.entity) ? html`<button class="tune ${classMap({ active })}" @click=${(e: Event) => this._openEdit(l.entity, e)} aria-label="Tune ${this._shortName(l)}"><ha-icon icon="mdi:tune-variant"></ha-icon></button>` : nothing}
             </div>`;
           })}
         </div>` : nothing}
@@ -324,6 +325,9 @@ export class RoomCard extends LitElement {
     .pt { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 42px; padding: 0 13px; font-size: 12.5px; font-weight: 550; color: color-mix(in srgb, var(--primary-text-color) 70%, transparent); transition: color .28s ease; }
     .pt .pn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pb { margin-left: auto; padding-left: 8px; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--hl-ink-on-amber); opacity: .8; flex: 0 0 auto; }
+    .pb.off { color: var(--hl-text-3); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .04em; opacity: 1; }
+    .pill.offline { opacity: .5; }
+    .pill.offline .pt { color: var(--hl-text-3); }
     :host([dark]) .pill.on .pb { color: color-mix(in srgb, var(--hl-amber) 60%, #fff); }
     .pt .pn { transition: color .28s ease; }
     .pill.on .pt, .pill.on .pt .pn { color: var(--hl-ink-on-amber); }
