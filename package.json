@@ -1,6 +1,6 @@
 {
   "name": "homelab-lovelace-cards",
-  "version": "0.16.4",
+  "version": "0.17.1",
   "description": "A self-owned stable of custom Home Assistant Lovelace cards (phev-vehicle-card, battery-fleet-card, laundry-tracker-card).",
   "type": "module",
   "private": true,
