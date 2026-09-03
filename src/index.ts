@@ -13,7 +13,7 @@ import "./cards/room-card";
 import "./cards/presence-card";
 import "./cards/litter-card";
 
-const VERSION = "0.17.2";
+const VERSION = "0.18.0";
 // eslint-disable-next-line no-console
 console.info(
   `%c HOMELAB-LOVELACE-CARDS %c v${VERSION} `,

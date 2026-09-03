@@ -12,6 +12,10 @@ import { css } from "lit";
 export const hearth = css`
   :host {
     --hl-amber: #f5b301;
+    --hl-amber-hot: oklch(0.87 0.17 90);   /* gradient top (lit) */
+    --hl-amber-deep: oklch(0.74 0.15 72);  /* gradient bottom */
+    --hl-ember: 31 18 2;                    /* warm near-black — use rgb(var(--hl-ember) / a) for shadows */
+    --hl-ink-on-amber: oklch(0.34 0.06 75); /* text/icons ON amber fills (raw amber fails contrast) */
     --hl-glow: color-mix(in srgb, var(--hl-amber) 22%, transparent);
     --hl-hair: color-mix(in srgb, var(--primary-text-color) 9%, transparent);
     --hl-wash-1: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
@@ -42,6 +46,26 @@ export const hearth = css`
 
   /* every card settles in on load (cards that set their own animation override) */
   ha-card { animation: hl-rise var(--hl-d3) var(--hl-settle) both; }
+
+  /* Warm-material state language (Fable): OFF = recessed well carved into the
+     surface; ON = a glowing amber fill sitting proud of it. Cards toggle a
+     [dark] attribute on the host (from hass.themes.darkMode) for the dark tuning. */
+  .hl-well {
+    background: color-mix(in oklab, rgb(var(--hl-ember)) 5%, var(--card-background-color, #fff));
+    box-shadow: inset 0 1.5px 3px rgb(var(--hl-ember) / 0.08), inset 0 -1px 0 rgb(255 255 255 / 0.5);
+    border: none;
+  }
+  :host([dark]) .hl-well {
+    background: color-mix(in oklab, black 22%, var(--card-background-color, #111));
+    box-shadow: inset 0 1.5px 3px rgb(0 0 0 / 0.4);
+  }
+  .hl-fill {
+    background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep));
+    color: var(--hl-ink-on-amber);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), 0 2px 6px rgb(184 124 0 / 0.3);
+    border: none;
+  }
+  .hl-fill ha-icon { color: var(--hl-ink-on-amber); }
 
   /* Tactile press feedback across the dashboard. Loaded before each card's own
      css, so where a card already animates an element (e.g. .tab background) that

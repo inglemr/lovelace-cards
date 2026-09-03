@@ -51,7 +51,7 @@ export class RoomCard extends LitElement {
   private _throttle = 0;
   private _vDrag = false;
 
-  set hass(h: HomeAssistant) { this._hass = h; this.requestUpdate(); }
+  set hass(h: HomeAssistant) { this._hass = h; this.toggleAttribute("dark", !!(h?.themes as any)?.darkMode); this.requestUpdate(); }
   get hass(): HomeAssistant | undefined { return this._hass; }
 
   static getStubConfig(): RoomCardConfig { return { type: "custom:homelab-room-card", name: "Room", lights: [] }; }
@@ -155,7 +155,7 @@ export class RoomCard extends LitElement {
     const ambient = anyOn ? Math.max(0.15, (dark ? 0.9 : 0.45) * (onCount / Math.max(1, total)) * this._meanBriFrac()) : 0;
 
     return html`
-      <ha-card class=${classMap({ lit: anyOn })} style=${styleMap({ "--rc-glow": this._glowColor(), "--pct": `${pct}%`, "--ambient": String(ambient) })}>
+      <ha-card class=${classMap({ lit: anyOn })} style=${styleMap({ "--rc-glow": this._glowColor(), "--pct": `${pct}%`, "--pctnum": String(pct / 100), "--ambient": String(ambient) })}>
         <div class="ambient" aria-hidden="true"></div>
 
         <div class="header">
@@ -170,7 +170,7 @@ export class RoomCard extends LitElement {
         ${hasDimmable ? html`<div class="wellwrap">
           <div class="readout ${classMap({ show: this._dragVal !== undefined })}">${pct}%</div>
           <div class="well ${classMap({ dragging: this._dragging, cold: !anyOn })}">
-            <div class="fill"></div>
+            <div class="fill"><span class="handle"></span><span class="lvl">${pct}%</span></div>
             <input class="wellinput" type="range" min="1" max="100" .value=${String(Math.max(1, pct))}
               @pointerdown=${() => this._wellDown()} @pointerup=${() => this._wellUp()} @pointercancel=${() => this._wellUp()}
               @input=${(e: Event) => this._onInput(e)} @change=${(e: Event) => this._onChange(e)} @click=${(e: Event) => e.stopPropagation()} aria-label="${c.name} brightness" />
@@ -254,52 +254,83 @@ export class RoomCard extends LitElement {
     @property --rc-glow { syntax: "<color>"; inherits: true; initial-value: #f2a93b; }
     :host { --amber: #f5b301; --hair: color-mix(in srgb, var(--primary-text-color) 12%, transparent); display: block; }
 
-    ha-card { position: relative; overflow: hidden; box-sizing: border-box; height: 100%; border-radius: var(--hl-r-card); box-shadow: var(--hl-e1); padding: 14px 14px 12px;
-      background: var(--ha-card-background, var(--card-background-color, #16181d)); border: 1px solid var(--divider-color, rgba(0,0,0,.08)); animation: hl-rise var(--hl-d3) var(--hl-settle) both; transition: border-color .6s ease, --rc-glow .8s linear; }
-    ha-card.lit { border-color: color-mix(in srgb, var(--rc-glow) 22%, var(--divider-color, transparent)); }
+    ha-card { position: relative; overflow: hidden; box-sizing: border-box; height: 100%; border-radius: var(--hl-r-card); padding: 14px 14px 12px;
+      background: linear-gradient(180deg, color-mix(in oklab, var(--hl-amber) 4%, var(--card-background-color, #fff)), color-mix(in oklab, var(--hl-amber) 8%, var(--card-background-color, #fff)));
+      border: 1px solid color-mix(in srgb, var(--hl-amber) 20%, transparent);
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / .75), 0 1px 2px rgb(var(--hl-ember) / .06), 0 6px 16px rgb(var(--hl-ember) / .08), 0 24px 48px -24px rgb(var(--hl-ember) / .16);
+      animation: hl-rise var(--hl-d3) var(--hl-settle) both; transition: border-color .6s ease, box-shadow .5s ease, --rc-glow .8s linear; }
+    :host([dark]) ha-card {
+      background: linear-gradient(180deg, color-mix(in oklab, var(--hl-amber) 7%, var(--card-background-color, #16181d)), color-mix(in oklab, var(--hl-amber) 3%, var(--card-background-color, #16181d)));
+      border-color: color-mix(in srgb, var(--hl-amber) 14%, transparent);
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / .06), 0 8px 24px rgb(0 0 0 / .35); }
+    ha-card.lit { border-color: color-mix(in srgb, var(--hl-amber) 26%, transparent);
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / .75), 0 1px 2px rgb(var(--hl-ember) / .06), 0 6px 16px rgb(var(--hl-ember) / .08), 0 24px 48px -24px rgb(var(--hl-ember) / .16), 0 0 0 1px color-mix(in srgb, var(--hl-amber) 12%, transparent), 0 10px 30px -10px rgb(245 179 1 / .20); }
+    :host([dark]) ha-card.lit { box-shadow: inset 0 1px 0 rgb(255 255 255 / .06), 0 8px 24px rgb(0 0 0 / .35), 0 10px 30px -12px rgb(245 179 1 / .28); }
     .ambient { position: absolute; inset: 0; pointer-events: none; z-index: 0; border-radius: inherit; overflow: hidden; background: radial-gradient(140% 120% at 50% 82%, color-mix(in srgb, var(--rc-glow) 22%, transparent), transparent 65%); opacity: var(--ambient, 0); transition: opacity .6s ease; }
     @keyframes mount { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
     .header, .wellwrap, .pills, .media { position: relative; z-index: 1; }
     button { -webkit-appearance: none; appearance: none; font-family: inherit; border: none; background: none; padding: 0; margin: 0; cursor: pointer; color: inherit; }
 
     .header { display: grid; grid-template-columns: 36px 1fr auto; column-gap: 10px; align-items: center; }
-    .key { width: 36px; height: 36px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--primary-text-color) 6%, transparent); transition: background .5s ease; }
-    ha-card.lit .key { background: color-mix(in srgb, var(--rc-glow) 12%, transparent); }
-    .key ha-icon { --mdc-icon-size: 21px; color: var(--secondary-text-color); transition: color .5s ease; }
-    ha-card.lit .key ha-icon { color: color-mix(in srgb, var(--rc-glow) 70%, var(--primary-text-color)); }
+    .key { width: 40px; height: 40px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; transition: background .5s ease, box-shadow .5s ease;
+      background: color-mix(in oklab, rgb(var(--hl-ember)) 5%, var(--card-background-color, #fff)); box-shadow: inset 0 1.5px 3px rgb(var(--hl-ember) / .08), inset 0 -1px 0 rgb(255 255 255 / .5); }
+    :host([dark]) .key { background: color-mix(in oklab, black 22%, var(--card-background-color, #16181d)); box-shadow: inset 0 1.5px 3px rgb(0 0 0 / .4); }
+    ha-card.lit .key { background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .4), 0 2px 6px rgb(184 124 0 / .3); }
+    .key ha-icon { --mdc-icon-size: 21px; color: color-mix(in srgb, var(--primary-text-color) 55%, transparent); transition: color .5s ease; }
+    ha-card.lit .key ha-icon { color: var(--hl-ink-on-amber); }
     .title { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; column-gap: 4px; text-align: left; min-width: 0; }
     .name { font-size: 15px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .chev { --mdc-icon-size: 15px; color: var(--secondary-text-color); opacity: .5; transition: transform .15s ease, opacity .15s ease; align-self: center; }
     .title:hover .chev { transform: translateX(2px); opacity: .9; }
     .count { grid-column: 1 / -1; font-size: 11px; color: var(--secondary-text-color); margin-top: 2px; }
-    .power { position: relative; width: 30px; height: 30px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: var(--secondary-text-color); border: 1.5px solid color-mix(in srgb, var(--primary-text-color) 20%, transparent); transition: background .2s, color .2s, border-color .2s, transform .09s; }
-    .power.on { color: #1a1a1a; background: var(--amber); border-color: transparent; }
+    .power { position: relative; width: 40px; height: 40px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; border: none;
+      color: color-mix(in srgb, var(--primary-text-color) 55%, transparent);
+      background: color-mix(in oklab, rgb(var(--hl-ember)) 5%, var(--card-background-color, #fff)); box-shadow: inset 0 1.5px 3px rgb(var(--hl-ember) / .08), inset 0 -1px 0 rgb(255 255 255 / .5);
+      transition: background .3s, color .3s, box-shadow .3s, transform .09s; }
+    :host([dark]) .power { background: color-mix(in oklab, black 22%, var(--card-background-color, #16181d)); box-shadow: inset 0 1.5px 3px rgb(0 0 0 / .4); }
+    .power.on { color: var(--hl-ink-on-amber); background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep));
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / .4), 0 0 0 4px color-mix(in srgb, var(--hl-amber) 14%, transparent), 0 4px 12px rgb(245 179 1 / .35); }
     .power:active { transform: scale(.94); }
 
     .wellwrap { margin-top: 12px; }
     .readout { text-align: right; height: 14px; margin-bottom: 3px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--secondary-text-color); opacity: 0; transition: opacity .12s ease; }
     .readout.show { opacity: 1; }
-    .well { position: relative; height: 30px; border-radius: 15px; overflow: hidden; background: color-mix(in srgb, var(--primary-text-color) 7%, transparent); }
-    .fill { position: absolute; inset: 0 auto 0 0; width: max(var(--pct), 9%); border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--rc-glow) 55%, #fff8ec), var(--rc-glow)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35); transition: width .45s var(--hl-settle), background .3s linear; }
+    .well { position: relative; height: 44px; border-radius: 22px; overflow: hidden;
+      background: color-mix(in oklab, rgb(var(--hl-ember)) 5%, var(--card-background-color, #fff)); box-shadow: inset 0 1.5px 3px rgb(var(--hl-ember) / .1), inset 0 -1px 0 rgb(255 255 255 / .5); }
+    :host([dark]) .well { background: color-mix(in oklab, black 24%, var(--card-background-color, #16181d)); box-shadow: inset 0 2px 4px rgb(0 0 0 / .45); }
+    .fill { position: absolute; inset: 0 auto 0 0; width: max(var(--pct), 12%); border-radius: inherit; overflow: hidden;
+      background: linear-gradient(180deg, var(--hl-amber-hot), var(--hl-amber-deep));
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / .45), inset 0 -1px 2px rgb(var(--hl-ember) / .15);
+      transition: width .45s var(--hl-settle); }
+    /* under-glow: opacity IS the brightness */
+    .fill::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: 0 3px 14px rgb(245 179 1 / .5); opacity: var(--pctnum, 0); transition: opacity .45s ease; }
     .well.cold .fill { width: 0; }
     .well.dragging .fill { transition: none; }
+    .fill .handle { position: absolute; right: 8px; top: 20%; height: 60%; width: 3px; border-radius: 3px; background: rgb(255 255 255 / .85); box-shadow: 0 1px 2px rgb(var(--hl-ember) / .25); }
+    .fill .lvl { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--hl-ink-on-amber); }
+    .well.cold .fill .lvl, .well.cold .fill .handle { display: none; }
     .wellinput { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; -webkit-appearance: none; appearance: none; background: transparent; }
-    .wellinput::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; }
+    .wellinput::-webkit-slider-thumb { -webkit-appearance: none; width: 44px; height: 44px; }
     .wellinput:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: inherit; }
 
-    .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
-    .pill { display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden; border: 1px solid var(--hair); background: transparent; transition: background .22s ease, border-color .22s ease; }
-    .pill.on { border-color: color-mix(in srgb, var(--rc-glow) 30%, transparent); background: color-mix(in srgb, var(--rc-glow) 11%, transparent); }
-    .pt { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px 0 8px; font-size: 12px; font-weight: 500; color: var(--primary-text-color); }
-    .pt .pn { color: color-mix(in srgb, var(--primary-text-color) 55%, transparent); transition: color .22s ease; }
-    .pill.on .pt .pn { color: var(--primary-text-color); }
-    .dot { width: 8px; height: 8px; border-radius: 999px; box-sizing: border-box; border: 1.5px solid color-mix(in srgb, var(--primary-text-color) 32%, transparent); background: transparent; transition: background .3s linear, border-color .3s linear, transform .22s ease; }
+    .pills { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+    .pill { display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden; border: none; min-height: 40px;
+      background: color-mix(in oklab, rgb(var(--hl-ember)) 5%, var(--card-background-color, #fff)); box-shadow: inset 0 1.5px 3px rgb(var(--hl-ember) / .07), inset 0 -1px 0 rgb(255 255 255 / .5);
+      transition: background .28s var(--hl-settle), box-shadow .28s var(--hl-settle); }
+    :host([dark]) .pill { background: color-mix(in oklab, black 20%, var(--card-background-color, #16181d)); box-shadow: inset 0 1.5px 3px rgb(0 0 0 / .35); }
+    .pill.on { background: linear-gradient(180deg, color-mix(in oklab, var(--hl-amber) 22%, var(--card-background-color, #fff)), color-mix(in oklab, var(--hl-amber) 32%, var(--card-background-color, #fff)));
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / .5), 0 2px 6px rgb(184 124 0 / .22); }
+    .pt { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 13px 0 11px; font-size: 12.5px; font-weight: 550; color: color-mix(in srgb, var(--primary-text-color) 70%, transparent); transition: color .28s ease; }
+    .pt .pn { transition: color .28s ease; }
+    .pill.on .pt, .pill.on .pt .pn { color: var(--hl-ink-on-amber); }
+    :host([dark]) .pill.on .pt, :host([dark]) .pill.on .pt .pn { color: color-mix(in srgb, var(--hl-amber) 60%, #fff); }
+    .dot { width: 8px; height: 8px; border-radius: 999px; box-sizing: border-box; border: 1.5px solid color-mix(in srgb, var(--primary-text-color) 30%, transparent); background: transparent; transition: background .3s linear, border-color .3s linear, box-shadow .3s ease, transform .22s ease; }
     .dot.sq { border-radius: 2.5px; }
-    .pill.on .dot { background: var(--dot-color, var(--amber)); border: 1px solid color-mix(in srgb, var(--primary-text-color) 25%, transparent); animation: settle .22s ease; }
-    .tune { width: 30px; display: inline-flex; align-items: center; justify-content: center; border-left: 1px solid var(--hair); color: var(--secondary-text-color); transition: background .22s ease; }
+    .pill.on .dot { background: var(--dot-color, var(--hl-amber)); border-color: transparent; box-shadow: 0 0 6px color-mix(in srgb, var(--dot-color, var(--hl-amber)) 60%, transparent); animation: settle .22s ease; }
+    .tune { width: 34px; display: inline-flex; align-items: center; justify-content: center; border-left: 1px solid color-mix(in srgb, currentColor 14%, transparent); color: inherit; transition: background .22s ease; }
     .tune ha-icon { --mdc-icon-size: 15px; opacity: .55; }
-    .tune.active { background: color-mix(in srgb, var(--rc-glow) 16%, transparent); }
-    .tune.active ha-icon { opacity: 1; color: color-mix(in srgb, var(--rc-glow) 60%, var(--primary-text-color)); }
+    .tune.active { background: rgb(255 255 255 / .25); }
+    .tune.active ha-icon { opacity: 1; }
     .pt:active, .tune:active { transform: scale(.96); }
     @keyframes settle { from { transform: scale(.6); } to { transform: scale(1); } }
 
