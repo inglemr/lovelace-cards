@@ -407,18 +407,23 @@ export class RoomCard extends LitElement {
     .sheet-x { width: 28px; height: 28px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: var(--secondary-text-color); background: color-mix(in srgb, var(--primary-text-color) 8%, transparent); }
     .sheet-x ha-icon { --mdc-icon-size: 17px; }
 
-    .vbar { position: relative; height: 240px; border-radius: 26px; overflow: hidden; cursor: ns-resize; touch-action: none; user-select: none;
-      background: color-mix(in srgb, var(--primary-text-color) 8%, transparent); }
-    .vfill { position: absolute; inset: auto 0 0 0; border-radius: 26px; background: linear-gradient(0deg, color-mix(in srgb, var(--fill) 78%, #000 6%), color-mix(in srgb, var(--fill) 92%, #fff 30%)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .4); transition: height .12s ease; }
+    .vbar { position: relative; height: 224px; border-radius: 24px; overflow: hidden; cursor: ns-resize; touch-action: none; user-select: none;
+      background: color-mix(in oklab, rgb(var(--hl-ember)) 6%, var(--card-background-color, #fff)); box-shadow: inset 0 2px 6px rgb(var(--hl-ember) / .12), inset 0 -1px 0 rgb(255 255 255 / .3); }
+    :host([dark]) .vbar { background: color-mix(in oklab, black 32%, var(--card-background-color, #16181d)); box-shadow: inset 0 3px 10px rgb(0 0 0 / .5); }
+    .vfill { position: absolute; inset: auto 0 0 0; border-radius: 24px; transition: height .12s ease;
+      background: linear-gradient(0deg, color-mix(in srgb, var(--fill) 84%, #000 10%), color-mix(in srgb, var(--fill) 96%, #fff 22%));
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / .45), 0 0 26px -4px color-mix(in srgb, var(--fill) 55%, transparent); }
     .vbar:active .vfill, .sheet .vbar.dragging .vfill { transition: none; }
-    .vmeta { position: absolute; inset: auto 0 16px 0; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #1a1a1a; mix-blend-mode: multiply; pointer-events: none; }
-    .vmeta ha-icon { --mdc-icon-size: 22px; }
-    .vmeta span { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    /* value badge — readable on any fill/well (was dark multiply text, invisible in dark mode) */
+    .vmeta { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; pointer-events: none;
+      padding: 7px 15px; border-radius: 16px; color: #fff; background: rgb(0 0 0 / .32); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); box-shadow: 0 2px 8px rgb(0 0 0 / .3); }
+    .vmeta ha-icon { --mdc-icon-size: 21px; }
+    .vmeta span { font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
-    .swatches { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; justify-content: center; }
-    .sw { width: 30px; height: 30px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--primary-text-color) 18%, transparent); transition: transform .1s ease; }
-    .sw:active { transform: scale(.9); }
-    .sw.sel { outline: 2px solid color-mix(in srgb, var(--primary-text-color) 45%, transparent); outline-offset: 2px; }
+    .swatches { display: flex; flex-wrap: wrap; gap: 11px; margin-top: 18px; justify-content: center; }
+    .sw { width: 34px; height: 34px; border-radius: 999px; border: none; cursor: pointer; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .15), 0 2px 6px rgb(var(--hl-ember) / .3); transition: transform .12s var(--hl-shift); }
+    .sw.sel { outline: 2.5px solid var(--hl-amber); outline-offset: 2px; }
+    .sw:active { transform: scale(.88); }
     .sw.wheel { background: conic-gradient(from 0deg, #e8543f, #f59632, #e8d13f, #4fa863, #2fa8c7, #5b6fd4, #b45bd4, #e8543f); }
     .crow { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
     .link { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--secondary-text-color); }
